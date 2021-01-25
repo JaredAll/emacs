@@ -1,6 +1,6 @@
 ;;; cmuscheme.el --- Scheme process in a buffer. Adapted from tea.el
 
-;; Copyright (C) 1988, 1994, 1997, 2001-2020 Free Software Foundation,
+;; Copyright (C) 1988, 1994, 1997, 2001-2021 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Olin Shivers <olin.shivers@cs.cmu.edu>
@@ -327,9 +327,8 @@ With a prefix argument switch off tracing of procedure PROC."
   (interactive
    (list (let ((current (symbol-at-point))
                (action (if current-prefix-arg "Untrace" "Trace")))
-           (if current
-               (read-string (format "%s procedure [%s]: " action current) nil nil (symbol-name current))
-             (read-string (format "%s procedure: " action))))
+           (read-string (format-prompt "%s procedure" current action)
+                        nil nil (and current (symbol-name current))))
          current-prefix-arg))
   (when (= (length proc) 0)
     (error "Invalid procedure name"))

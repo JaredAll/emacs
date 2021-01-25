@@ -1,6 +1,6 @@
 ;;; help-fns.el --- Complex help functions -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1993-1994, 1998-2020 Free Software
+;; Copyright (C) 1985-1986, 1993-1994, 1998-2021 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -40,8 +40,8 @@
 (defvar help-fns-describe-function-functions nil
   "List of functions to run in help buffer in `describe-function'.
 Those functions will be run after the header line and argument
-list was inserted, and before the documentation will be inserted.
-The functions will receive the function name as argument.
+list was inserted, and before the documentation is inserted.
+The functions will be called with one argument: the function's symbol.
 They can assume that a newline was output just before they were called,
 and they should terminate any of their own output with a newline.
 By convention they should indent their output by 2 spaces.")
@@ -126,17 +126,48 @@ with the current prefix.  The files are chosen according to
   :group 'help
   :version "26.3")
 
+(defun help--symbol-completion-table-affixation (completions)
+  (mapcar (lambda (c)
+            (let* ((s (intern c))
+                   (doc (condition-case nil (documentation s) (error nil)))
+                   (doc (and doc (substring doc 0 (string-match "\n" doc)))))
+              (list c (propertize
+                       (concat (cond ((commandp s)
+                                      "c") ; command
+                                     ((eq (car-safe (symbol-function s)) 'macro)
+                                      "m") ; macro
+                                     ((fboundp s)
+                                      "f") ; function
+                                     ((custom-variable-p s)
+                                      "u") ; user option
+                                     ((boundp s)
+                                      "v") ; variable
+                                     ((facep s)
+                                      "a") ; fAce
+                                     ((and (fboundp 'cl-find-class)
+                                           (cl-find-class s))
+                                      "t")  ; CL type
+                                     (" ")) ; something else
+                               " ")         ; prefix separator
+                       'face 'completions-annotations)
+                    (if doc (propertize (format " -- %s" doc)
+                                        'face 'completions-annotations)
+                      ""))))
+          completions))
+
 (defun help--symbol-completion-table (string pred action)
-  (when help-enable-completion-autoload
-    (let ((prefixes (radix-tree-prefixes (help-definition-prefixes) string)))
-      (help--load-prefixes prefixes)))
-  (let ((prefix-completions
-         (and help-enable-completion-autoload
-              (mapcar #'intern (all-completions string definition-prefixes)))))
-    (complete-with-action action obarray string
-                          (if pred (lambda (sym)
-                                     (or (funcall pred sym)
-                                         (memq sym prefix-completions)))))))
+  (if (and completions-detailed (eq action 'metadata))
+      '(metadata (affixation-function . help--symbol-completion-table-affixation))
+    (when help-enable-completion-autoload
+      (let ((prefixes (radix-tree-prefixes (help-definition-prefixes) string)))
+        (help--load-prefixes prefixes)))
+    (let ((prefix-completions
+           (and help-enable-completion-autoload
+                (mapcar #'intern (all-completions string definition-prefixes)))))
+      (complete-with-action action obarray string
+                            (if pred (lambda (sym)
+                                       (or (funcall pred sym)
+                                           (memq sym prefix-completions))))))))
 
 (defvar describe-function-orig-buffer nil
   "Buffer that was current when `describe-function' was invoked.
@@ -151,9 +182,7 @@ When called from lisp, FUNCTION may also be a function object."
    (let* ((fn (function-called-at-point))
           (enable-recursive-minibuffers t)
           (val (completing-read
-                (if fn
-                    (format "Describe function (default %s): " fn)
-                  "Describe function: ")
+                (format-prompt "Describe function" fn)
                 #'help--symbol-completion-table
                 (lambda (f) (or (fboundp f) (get f 'function-documentation)))
                 t nil nil
@@ -364,6 +393,7 @@ suitable file is found, return nil."
 	  (help-C-file-name type 'subr)
 	'C-source))
      ((and (not file-name) (symbolp object)
+           (eq type 'defvar)
 	   (integerp (get object 'variable-documentation)))
       ;; A variable defined in C.  The form is from `describe-variable'.
       (if (get-buffer " *DOC*")
@@ -623,7 +653,7 @@ FILE is the file where FUNCTION was probably defined."
   ;; of the *packages* in which the function is defined.
   (let* ((name (symbol-name symbol))
          (re (concat "\\_<" (regexp-quote name) "\\_>"))
-         (news (directory-files data-directory t "\\`NEWS.[1-9]"))
+         (news (directory-files data-directory t "\\`NEWS\\(\\'\\|\\.\\)"))
          (place nil)
          (first nil))
     (with-temp-buffer
@@ -647,8 +677,7 @@ FILE is the file where FUNCTION was probably defined."
                     (setq place (list f pos))
                     (setq first version)))))))))
     (when first
-      (make-text-button first nil 'type 'help-news 'help-args place))
-    first))
+      (make-text-button first nil 'type 'help-news 'help-args place))))
 
 (add-hook 'help-fns-describe-function-functions
           #'help-fns--mention-first-release)
@@ -660,6 +689,41 @@ FILE is the file where FUNCTION was probably defined."
       (with-current-buffer standard-output
         (insert (format "  Probably introduced at or before Emacs version %s.\n"
                         first))))))
+
+(declare-function shortdoc-display-group "shortdoc")
+(declare-function shortdoc-function-groups "shortdoc")
+
+(add-hook 'help-fns-describe-function-functions
+          #'help-fns--mention-shortdoc-groups)
+(defun help-fns--mention-shortdoc-groups (object)
+  (require 'shortdoc)
+  (when-let ((groups (and (symbolp object)
+                          (shortdoc-function-groups object))))
+    (let ((start (point))
+          (times 0))
+      (with-current-buffer standard-output
+        (insert "  Other relevant functions are documented in the ")
+        (mapc
+         (lambda (group)
+           (when (> times 0)
+             (insert (if (= times (1- (length groups)))
+                         " and "
+                       ", ")))
+           (setq times (1+ times))
+           (insert-text-button
+            (symbol-name group)
+            'action (lambda (_)
+                      (shortdoc-display-group group))
+            'follow-link t
+            'help-echo (purecopy "mouse-1, RET: show documentation group")))
+         groups)
+        (insert (if (= (length groups) 1)
+                    " group.\n"
+                  " groups.\n")))
+      (save-restriction
+        (narrow-to-region start (point))
+        (fill-region-as-paragraph (point-min) (point-max))
+        (goto-char (point-max))))))
 
 (defun help-fns-short-filename (filename)
   (let* ((abbrev (abbreviate-file-name filename))
@@ -893,7 +957,7 @@ If ANY-SYMBOL is non-nil, don't insist the symbol be bound."
 	(output nil))
     (if custom-version
 	(setq output
-	      (format "This %s was introduced, or its default value was changed, in\nversion %s of Emacs.\n"
+	      (format "  This %s was introduced, or its default value was changed, in\n  version %s of Emacs.\n"
                       type custom-version))
       (when cpv
 	(let* ((package (car-safe cpv))
@@ -904,7 +968,7 @@ If ANY-SYMBOL is non-nil, don't insist the symbol be bound."
 	       (emacsv (cdr (assoc version pkg-versions))))
 	  (if (and package version)
 	      (setq output
-		    (format (concat "This %s was introduced, or its default value was changed, in\nversion %s of the %s package"
+		    (format (concat "  This %s was introduced, or its default value was changed, in\n  version %s of the %s package"
 				    (if emacsv
 					(format " that is part of Emacs %s" emacsv))
 				    ".\n")
@@ -924,10 +988,7 @@ it is displayed along with the global value."
          (orig-buffer (current-buffer))
 	 val)
      (setq val (completing-read
-                (if (symbolp v)
-                    (format
-                     "Describe variable (default %s): " v)
-                  "Describe variable: ")
+                (format-prompt "Describe variable" (and (symbolp v) v))
                 #'help--symbol-completion-table
                 (lambda (vv)
                   ;; In case the variable only exists in the buffer
@@ -1078,8 +1139,7 @@ it is displayed along with the global value."
 		(when (looking-at "value is") (replace-match ""))
 		(save-excursion
 		  (insert "\n\nValue:")
-		  (set (make-local-variable 'help-button-cache)
-		       (point-marker)))
+                  (setq-local help-button-cache (point-marker)))
 		(insert "value is shown ")
 		(insert-button "below"
 			       'action help-button-cache
@@ -1125,8 +1185,8 @@ it is displayed along with the global value."
     ;; Note variable's version or package version.
     (let ((output (describe-variable-custom-version-info variable)))
       (when output
-	(terpri)
-	(terpri)
+	;; (terpri)
+	;; (terpri)
 	(princ output)))))
 
 (add-hook 'help-fns-describe-variable-functions #'help-fns--var-safe-local)
@@ -1424,10 +1484,8 @@ current buffer and the selected frame, respectively."
           (v-or-f (if found v-or-f (function-called-at-point)))
           (found (or found v-or-f))
           (enable-recursive-minibuffers t)
-          (val (completing-read (if found
-				    (format
-                                     "Describe symbol (default %s): " v-or-f)
-				  "Describe symbol: ")
+          (val (completing-read (format-prompt "Describe symbol"
+                                               (and found v-or-f))
 				#'help--symbol-completion-table
 				(lambda (vv)
                                   (cl-some (lambda (x) (funcall (nth 1 x) vv))
@@ -1595,6 +1653,9 @@ in `describe-keymap'.  See also `Searching the Active Keymaps'."
                              (get-char-property (point) 'local-map)
                            (current-local-map)))))
 
+(defvar keymap-name-history nil
+  "History for input to `describe-keymap'.")
+
 ;;;###autoload
 (defun describe-keymap (keymap)
   "Describe key bindings in KEYMAP.
@@ -1603,7 +1664,7 @@ keymap value."
   (interactive
    (let* ((km (help-fns--most-relevant-active-keymap))
           (val (completing-read
-                (format "Keymap (default %s): " km)
+                (format-prompt "Keymap" km)
                 obarray
                 (lambda (m) (and (boundp m) (keymapp (symbol-value m))))
                 t nil 'keymap-name-history
@@ -1770,6 +1831,50 @@ documentation for the major and minor modes of that buffer."
   ;; For the sake of IELM and maybe others
   nil)
 
+;; Widgets.
+
+(defvar describe-widget-functions
+  '(button-describe widget-describe)
+  "A list of functions for `describe-widget' to call.
+Each function should take one argument, a buffer position, and return
+non-nil if it described a widget at that position.")
+
+;;;###autoload
+(defun describe-widget (&optional pos)
+  "Display a buffer with information about a widget.
+You can use this command to describe buttons (e.g., the links in a *Help*
+buffer), editable fields of the customization buffers, etc.
+
+Interactively, click on a widget to describe it, or hit RET to describe the
+widget at point.
+
+When called from Lisp, POS may be a buffer position or a mouse position list.
+
+Calls each function of the list `describe-widget-functions' in turn, until
+one of them returns non-nil."
+  (interactive
+   (list
+    (let ((key
+           (read-key
+            "Click on a widget, or hit RET to describe the widget at point")))
+      (cond ((eq key ?\C-m) (point))
+            ((and (mouse-event-p key)
+                  (eq (event-basic-type key) 'mouse-1)
+                  (equal (event-modifiers key) '(click)))
+             (event-end key))
+            ((eq key ?\C-g) (signal 'quit nil))
+            (t (user-error "You didn't specify a widget"))))))
+  (let (buf)
+    ;; Allow describing a widget in a different window.
+    (when (posnp pos)
+      (setq buf (window-buffer (posn-window pos))
+            pos (posn-point pos)))
+    (with-current-buffer (or buf (current-buffer))
+      (unless (cl-some (lambda (fun) (when (fboundp fun) (funcall fun pos)))
+                       describe-widget-functions)
+        (message "No widget found at that position")))))
+
+
 ;;; Replacements for old lib-src/ programs.  Don't seem especially useful.
 
 ;; Replaces lib-src/digest-doc.c.

@@ -1,6 +1,6 @@
 /* Utility and Unix shadow routines for GNU Emacs on the Microsoft Windows API.
 
-Copyright (C) 1994-1995, 2000-2020 Free Software Foundation, Inc.
+Copyright (C) 1994-1995, 2000-2021 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -2370,6 +2370,26 @@ srandom (int seed)
   iz = rand () % RAND_MAX_Z;
 }
 
+/* Emulate explicit_bzero.  This is to avoid using the Gnulib version,
+   because it calls SecureZeroMemory at will, disregarding systems
+   older than Windows XP, which didn't have that function.  We want to
+   avoid having that function as dependency in builds that need to
+   support systems older than Windows XP, otherwise Emacs will refuse
+   to start on those systems.  */
+void
+explicit_bzero (void *buf, size_t len)
+{
+#if _WIN32_WINNT >= 0x0501
+  /* We are compiling for XP or newer, most probably with MinGW64.
+     We can use SecureZeroMemory.  */
+  SecureZeroMemory (buf, len);
+#else
+  memset (buf, 0, len);
+  /* Compiler barrier.  */
+  asm volatile ("" ::: "memory");
+#endif
+}
+
 /* Return the maximum length in bytes of a multibyte character
    sequence encoded in the current ANSI codepage.  This is required to
    correctly walk the encoded file names one character at a time.  */
@@ -3441,8 +3461,6 @@ is_fat_volume (const char * name, const char ** pPath)
 /* Convert all slashes in a filename to backslashes, and map filename
    to a valid 8.3 name if necessary.  The result is a pointer to a
    static buffer, so CAVEAT EMPTOR!  */
-const char *map_w32_filename (const char *, const char **);
-
 const char *
 map_w32_filename (const char * name, const char ** pPath)
 {
@@ -6126,7 +6144,7 @@ is_symlink (const char *filename)
 
 /* If NAME identifies a symbolic link, copy into BUF the file name of
    the symlink's target.  Copy at most BUF_SIZE bytes, and do NOT
-   NUL-terminate the target name, even if it fits.  Return the number
+   null-terminate the target name, even if it fits.  Return the number
    of bytes copied, or -1 if NAME is not a symlink or any error was
    encountered while resolving it.  The file name copied into BUF is
    encoded in the current ANSI codepage.  */
@@ -6230,10 +6248,10 @@ readlink (const char *name, char *buf, size_t buf_size)
 	  size_t size_to_copy = buf_size;
 
 	  /* According to MSDN, PrintNameLength does not include the
-	     terminating NUL character.  */
+	     terminating null character.  */
 	  lwname = alloca ((lwname_len + 1) * sizeof(WCHAR));
 	  memcpy (lwname, lwname_src, lwname_len);
-	  lwname[lwname_len/sizeof(WCHAR)] = 0; /* NUL-terminate */
+	  lwname[lwname_len/sizeof(WCHAR)] = 0; /* null-terminate */
 	  filename_from_utf16 (lwname, resolved);
 	  dostounix_filename (resolved);
 	  lname_size = strlen (resolved) + 1;
@@ -6501,7 +6519,16 @@ acl_get_file (const char *fname, acl_type_t type)
 	      if (!get_file_security (fname, si, psd, sd_len, &sd_len))
 		{
 		  xfree (psd);
-		  errno = EIO;
+		  err = GetLastError ();
+		  if (err == ERROR_NOT_SUPPORTED
+		      || err == ERROR_ACCESS_DENIED)
+		    errno = ENOTSUP;
+		  else if (err == ERROR_FILE_NOT_FOUND
+			   || err == ERROR_PATH_NOT_FOUND
+			   || err == ERROR_INVALID_NAME)
+		    errno = ENOENT;
+		  else
+		    errno = EIO;
 		  psd = NULL;
 		}
 	    }
@@ -6512,6 +6539,12 @@ acl_get_file (const char *fname, acl_type_t type)
 		      be encoded in the current ANSI codepage. */
 		   || err == ERROR_INVALID_NAME)
 	    errno = ENOENT;
+	  else if (err == ERROR_NOT_SUPPORTED
+		   /* ERROR_ACCESS_DENIED is what we get for a volume
+		      mounted by WebDAV, which evidently doesn't
+		      support ACLs.  */
+		   || err == ERROR_ACCESS_DENIED)
+	    errno = ENOTSUP;
 	  else
 	    errno = EIO;
 	}
@@ -8634,6 +8667,11 @@ pipe2 (int * phandles, int pipe2_flags)
 	{
 	  _close (phandles[0]);
 	  _close (phandles[1]);
+	  /* Since we close the handles, set them to -1, so as to
+	     avoid an assertion violation if the caller then tries to
+	     close the handle again (emacs_close will abort otherwise
+	     if errno is EBADF).  */
+	  phandles[0] = phandles[1] = -1;
 	  errno = EMFILE;
 	  rc = -1;
 	}
@@ -9851,7 +9889,7 @@ w32_read_registry (HKEY rootkey, Lisp_Object lkey, Lisp_Object lname)
       /* Convert input strings to UTF-16.  */
       encoded_key = code_convert_string_norecord (lkey, Qutf_16le, 1);
       memcpy (key_w, SSDATA (encoded_key), SBYTES (encoded_key));
-      /* wchar_t strings need to be terminated by 2 NUL bytes.  */
+      /* wchar_t strings need to be terminated by 2 null bytes.  */
       key_w [SBYTES (encoded_key)/2] = L'\0';
       encoded_vname = code_convert_string_norecord (lname, Qutf_16le, 1);
       memcpy (value_w, SSDATA (encoded_vname), SBYTES (encoded_vname));
@@ -9943,7 +9981,7 @@ w32_read_registry (HKEY rootkey, Lisp_Object lkey, Lisp_Object lname)
       case REG_SZ:
 	if (use_unicode)
 	  {
-	    /* pvalue ends with 2 NUL bytes, but we need only one,
+	    /* pvalue ends with 2 null bytes, but we need only one,
 	       and AUTO_STRING_WITH_LEN will add it.  */
 	    if (pvalue[vsize - 1] == '\0')
 	      vsize -= 2;
@@ -9952,7 +9990,7 @@ w32_read_registry (HKEY rootkey, Lisp_Object lkey, Lisp_Object lname)
 	  }
 	else
 	  {
-	    /* Don't waste a byte on the terminating NUL character,
+	    /* Don't waste a byte on the terminating null character,
 	       since make_unibyte_string will add one anyway.  */
 	    if (pvalue[vsize - 1] == '\0')
 	      vsize--;
@@ -10225,6 +10263,10 @@ term_ntproc (int ignored)
   term_winsock ();
 
   term_w32select ();
+
+#if HAVE_NATIVE_IMAGE_API
+  w32_gdiplus_shutdown ();
+#endif
 }
 
 void

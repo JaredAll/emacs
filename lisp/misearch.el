@@ -1,6 +1,6 @@
 ;;; misearch.el --- isearch extensions for multi-buffer search
 
-;; Copyright (C) 2007-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2021 Free Software Foundation, Inc.
 
 ;; Author: Juri Linkov <juri@jurta.org>
 ;; Keywords: matching
@@ -236,11 +236,7 @@ set in `multi-isearch-buffers' or `multi-isearch-buffers-regexp'."
 	 (buf nil)
 	 (ido-ignore-item-temp-list bufs))
     (while (not (string-equal
-		 (setq buf (read-buffer
-			    (if (eq read-buffer-function #'ido-read-buffer)
-				"Next buffer to search (C-j to end): "
-			      "Next buffer to search (RET to end): ")
-			    nil t))
+		 (setq buf (read-buffer (multi-occur--prompt) nil t))
 		 ""))
       (add-to-list 'bufs buf)
       (setq ido-ignore-item-temp-list bufs))

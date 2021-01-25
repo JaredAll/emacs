@@ -1,6 +1,6 @@
 ;;; ucs-normalize --- tests for international/ucs-normalize.el -*- lexical-binding: t -*-
 
-;; Copyright (C) 2002-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2021 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -340,5 +340,16 @@ implementations:
             (princ (buffer-string) standard-output)
           (display-buffer (current-buffer)))
       (message "No changes to failing lines needed"))))
+
+(ert-deftest ucs-normalize-save-match-data ()
+  "Verify that match data isn't clobbered (bug#41445)"
+  (string-match (rx (+ digit)) "a47b")
+  (should (equal (match-data t) '(1 3)))
+  (should (equal
+           (decode-coding-string
+            (encode-coding-string "Käsesoßenrührlöffel" 'utf-8-hfs)
+            'utf-8-hfs)
+           "Käsesoßenrührlöffel"))
+  (should (equal (match-data t) '(1 3))))
 
 ;;; ucs-normalize-tests.el ends here

@@ -1,12 +1,13 @@
 ;;; speedbar --- quick access to files and tags in a frame
 
-;; Copyright (C) 1996-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2021 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: file, tags, tools
 
 (defvar speedbar-version "1.0"
   "The current version of speedbar.")
+(make-obsolete-variable 'speedbar-version nil "28.1")
 (defvar speedbar-incompatible-version "0.14beta4"
   "This version of speedbar is incompatible with this version.
 Due to massive API changes (removing the use of the word PATH)
@@ -898,12 +899,9 @@ This basically creates a sparse keymap, and makes its parent be
   "Additional menu items while in file-mode.")
 
 (defvar speedbar-easymenu-definition-trailer
-  (append
-   (if (and (featurep 'custom) (fboundp 'custom-declare-variable))
-       (list ["Customize..." speedbar-customize t]))
-   (list
+  '(["Customize..." speedbar-customize t]
     ["Close" dframe-close-frame t]
-    ["Quit" delete-frame t] ))
+    ["Quit" delete-frame t])
   "Menu items appearing at the end of the speedbar menu.")
 
 (defvar speedbar-desired-buffer nil
@@ -981,10 +979,9 @@ supported at a time.
     (speedbar-set-timer dframe-update-speed)
     )
   ;; Frame modifications
-  (set (make-local-variable 'dframe-delete-frame-function)
-       'speedbar-handle-delete-frame)
+  (setq-local dframe-delete-frame-function 'speedbar-handle-delete-frame)
   ;; hscroll
-  (set (make-local-variable 'auto-hscroll-mode) nil)
+  (setq-local auto-hscroll-mode nil)
   ;; reset the selection variable
   (setq speedbar-last-selected-file nil))
 
@@ -1077,9 +1074,8 @@ in the selected file.
   (save-excursion
     (setq font-lock-keywords nil) ;; no font-locking please
     (setq truncate-lines t)
-    (make-local-variable 'frame-title-format)
-    (setq frame-title-format (concat "Speedbar " speedbar-version)
-	  case-fold-search nil
+    (setq-local frame-title-format "Speedbar")
+    (setq case-fold-search nil
 	  buffer-read-only t)
     (speedbar-set-mode-line-format)
     ;; Add in our dframe hooks.
@@ -1146,6 +1142,7 @@ frame and window to be the currently active frame and window."
 
 (defvar speedbar-previous-menu nil
   "The menu before the last `speedbar-reconfigure-keymaps' was called.")
+(make-obsolete-variable 'speedbar-previous-menu "no longer used." "28.1")
 
 (defun speedbar-reconfigure-keymaps ()
   "Reconfigure the menu-bar in a speedbar frame.
@@ -1197,10 +1194,7 @@ and the existence of packages."
 			 (speedbar-initial-keymap)
 			 ;; This creates a small keymap we can glom the
 			 ;; menu adjustments into.
-			 (speedbar-make-specialized-keymap)))
-      ;; Delete the old menu if applicable.
-      (if speedbar-previous-menu (easy-menu-remove speedbar-previous-menu))
-      (setq speedbar-previous-menu md)
+                         (speedbar-make-specialized-keymap)))
       ;; Now add the new menu
       (easy-menu-define speedbar-menu-map (current-local-map)
         "Speedbar menu" md))
@@ -1391,7 +1385,7 @@ Argument ARG represents to force a refresh past any caches that may exist."
     (if (and (file-exists-p f) (string-match "\\.el\\'" f))
 	(progn
 	  (dframe-select-attached-frame speedbar-frame)
-	  (byte-compile-file f nil)
+          (byte-compile-file f)
 	  (select-frame sf)
 	  (speedbar-reset-scanners)))
     ))
@@ -1758,8 +1752,9 @@ This is based on `speedbar-initial-expansion-list-name' referencing
   "Change speedbar's default expansion list to NEW-DEFAULT."
   (interactive
    (list
-    (completing-read (format "Speedbar Mode (default %s): "
-			     speedbar-previously-used-expansion-list-name)
+    (completing-read (format-prompt
+                      "Speedbar Mode"
+		      speedbar-previously-used-expansion-list-name)
 		     speedbar-initial-expansion-mode-alist
 		     nil t "" nil
 		     speedbar-previously-used-expansion-list-name)))
@@ -1817,16 +1812,13 @@ of the special mode functions."
 	      (setq v (intern-soft (concat ms "-speedbar-key-map")))
 	      (if (not v)
 		  nil ;; don't add special keymap
-		(make-local-variable 'speedbar-special-mode-key-map)
-		(setq speedbar-special-mode-key-map
-		      (symbol-value v)))
+                (setq-local speedbar-special-mode-key-map
+                            (symbol-value v)))
 	      (setq v (intern-soft (concat ms "-speedbar-menu-items")))
 	      (if (not v)
 		  nil ;; don't add special menus
-		(make-local-variable 'speedbar-easymenu-definition-special)
-		(setq speedbar-easymenu-definition-special
-		      (symbol-value v)))
-	      )))))))
+                (setq-local speedbar-easymenu-definition-special
+                            (symbol-value v))))))))))
 
 (defun speedbar-remove-localized-speedbar-support (buffer)
   "Remove any traces that BUFFER supports speedbar in a specialized way."
@@ -1875,9 +1867,9 @@ matches the user directory ~, then it is replaced with a ~.
 INDEX is not used, but is required by the caller."
   (let* ((tilde (expand-file-name "~/"))
 	 (dd (expand-file-name directory))
-	 (junk (string-match (regexp-quote tilde) dd))
+	 (junk (string-prefix-p "~/" dd))
 	 (displayme (if junk
-			(concat "~/" (substring dd (match-end 0)))
+			(concat "~/" (substring dd 2 nil))
 		      dd))
 	 (p (point)))
     (if (string-match "^~[/\\]?\\'" displayme) (setq displayme tilde))
@@ -3239,19 +3231,21 @@ With universal argument ARG, flush cached data."
   "Expand the line under the cursor and all descendants.
 Optional argument ARG indicates that any cache should be flushed."
   (interactive "P")
-  (speedbar-expand-line arg)
-  ;; Now, inside the area expanded here, expand all subnodes of
-  ;; the same descendant type.
-  (save-excursion
-    (speedbar-next 1) ;; Move into the list.
-    (let ((err nil))
-      (while (not err)
-	(condition-case nil
-	    (progn
-	      (speedbar-expand-line-descendants arg)
-	      (speedbar-restricted-next 1))
-	  (error (setq err t))))))
-  )
+  (save-restriction
+    (narrow-to-region (line-beginning-position)
+                      (line-beginning-position 2))
+    (speedbar-expand-line arg)
+    ;; Now, inside the area expanded here, expand all subnodes of
+    ;; the same descendant type.
+    (save-excursion
+      (speedbar-next 1) ;; Move into the list.
+      (let ((err nil))
+        (while (not err)
+	  (condition-case nil
+	      (progn
+	        (speedbar-expand-line-descendants arg)
+	        (speedbar-restricted-next 1))
+	    (error (setq err t))))))))
 
 (defun speedbar-contract-line-descendants ()
   "Expand the line under the cursor and all descendants."

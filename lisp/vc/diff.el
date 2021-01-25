@@ -1,6 +1,6 @@
 ;;; diff.el --- run `diff'  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1992, 1994, 1996, 2001-2020 Free Software Foundation,
+;; Copyright (C) 1992, 1994, 1996, 2001-2021 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Frank Bresz
@@ -145,9 +145,17 @@ Possible values are:
 
 (defun diff-no-select (old new &optional switches no-async buf)
   ;; Noninteractive helper for creating and reverting diff buffers
-  "Compare the OLD and NEW file/buffer, and return a diff buffer.
+  "Compare the OLD and NEW file/buffer.
+If the optional SWITCHES is nil, the switches specified in the
+variable ‘diff-switches’ are passed to the diff command,
+otherwise SWITCHES is used.  SWITCHES can be a string or a list
+of strings.
 
-See `diff' for the meaning of the arguments."
+If NO-ASYNC is non-nil, call diff synchronously.
+
+By default, this function creates the diff in the \"*Diff*\"
+buffer.  If BUF is non-nil, BUF is used instead.  This function
+returns the buffer used."
   (unless (bufferp new) (setq new (expand-file-name new)))
   (unless (bufferp old) (setq old (expand-file-name old)))
   (or switches (setq switches diff-switches)) ; If not specified, use default.
@@ -182,9 +190,9 @@ See `diff' for the meaning of the arguments."
 	(erase-buffer))
       (buffer-enable-undo (current-buffer))
       (diff-mode)
-      (set (make-local-variable 'revert-buffer-function)
-           (lambda (_ignore-auto _noconfirm)
-             (diff-no-select old new switches no-async (current-buffer))))
+      (setq-local revert-buffer-function
+                  (lambda (_ignore-auto _noconfirm)
+                    (diff-no-select old new switches no-async (current-buffer))))
       (setq default-directory thisdir)
       (setq diff-default-directory default-directory)
       (let ((inhibit-read-only t))
@@ -250,6 +258,8 @@ This requires the external program `diff' to be in your `exec-path'."
   (interactive "bBuffer: ")
   (let ((buf (get-buffer (or buffer (current-buffer)))))
     (with-current-buffer (or (buffer-base-buffer buf) buf)
+      (unless buffer-file-name
+        (error "Buffer is not visiting a file"))
       (diff buffer-file-name (current-buffer) nil 'noasync))))
 
 ;;;###autoload

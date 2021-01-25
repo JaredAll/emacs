@@ -1,6 +1,6 @@
 ;;; cl-macs.el --- Common Lisp macros  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993, 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1993, 2001-2021 Free Software Foundation, Inc.
 
 ;; Author: Dave Gillespie <daveg@synaptics.com>
 ;; Old-Version: 2.02
@@ -199,7 +199,7 @@ The name is made by appending a number to PREFIX, default \"T\"."
     [&optional ["&key" [cl-&key-arg &rest cl-&key-arg]
 		&optional "&allow-other-keys"]]
     [&optional ["&aux" &rest
-		&or (symbolp &optional def-form) symbolp]]
+		&or (cl-lambda-arg &optional def-form) arg]]
     . [&or arg nil])))
 
 (def-edebug-spec cl-&optional-arg
@@ -219,7 +219,7 @@ The name is made by appending a number to PREFIX, default \"T\"."
     [&optional ["&key" cl-&key-arg &rest cl-&key-arg
                 &optional "&allow-other-keys"]]
     [&optional ["&aux" &rest
-                &or (symbolp &optional def-form) symbolp]]
+                &or (cl-lambda-arg &optional def-form) arg]]
     . [&or arg nil])))
 
 (def-edebug-spec cl-type-spec sexp)
@@ -402,7 +402,7 @@ and BODY is implicitly surrounded by (cl-block NAME ...).
 			     arg]]
 		&optional "&allow-other-keys"]]
     [&optional ["&aux" &rest
-		&or (symbolp &optional def-form) symbolp]]
+		&or (cl-macro-arg &optional def-form) arg]]
     [&optional "&environment" arg]
     )))
 
@@ -421,7 +421,7 @@ and BODY is implicitly surrounded by (cl-block NAME ...).
 			     arg]]
 		&optional "&allow-other-keys"]]
     [&optional ["&aux" &rest
-		&or (symbolp &optional def-form) symbolp]]
+		&or (cl-macro-arg &optional def-form) arg]]
     . [&or arg nil])))
 
 ;;;###autoload
@@ -767,7 +767,7 @@ The result of the body appears to the compiler as a quoted constant."
   "Eval EXPR and choose among clauses on that value.
 Each clause looks like (KEYLIST BODY...).  EXPR is evaluated and
 compared against each key in each KEYLIST; the corresponding BODY
-is evaluated.  If no clause succeeds, cl-case returns nil.  A
+is evaluated.  If no clause succeeds, this macro returns nil.  A
 single non-nil atom may be used in place of a KEYLIST of one
 atom.  A KEYLIST of t or `otherwise' is allowed only in the final
 clause, and matches if no other keys match.  Key values are
@@ -806,10 +806,10 @@ compared by `eql'.
 
 ;;;###autoload
 (defmacro cl-typecase (expr &rest clauses)
-  "Evals EXPR, chooses among clauses on that value.
+  "Eval EXPR and choose among clauses on that value.
 Each clause looks like (TYPE BODY...).  EXPR is evaluated and, if it
 satisfies TYPE, the corresponding BODY is evaluated.  If no clause succeeds,
-cl-typecase returns nil.  A TYPE of t or `otherwise' is allowed only in the
+this macro returns nil.  A TYPE of t or `otherwise' is allowed only in the
 final clause, and matches if no other keys match.
 \n(fn EXPR (TYPE BODY...)...)"
   (declare (indent 1)
@@ -819,16 +819,15 @@ final clause, and matches if no other keys match.
       (cons
        'cond
        (mapcar
-        (function
-         (lambda (c)
-           (cons (cond ((eq (car c) 'otherwise) t)
-                       ((eq (car c) 'cl--ecase-error-flag)
-                        `(error "cl-etypecase failed: %s, %s"
-                                ,temp ',(reverse type-list)))
-                       (t
-                        (push (car c) type-list)
-                        `(cl-typep ,temp ',(car c))))
-                 (or (cdr c) '(nil)))))
+        (lambda (c)
+          (cons (cond ((eq (car c) 'otherwise) t)
+                      ((eq (car c) 'cl--ecase-error-flag)
+                       `(error "cl-etypecase failed: %s, %s"
+                               ,temp ',(reverse type-list)))
+                      (t
+                       (push (car c) type-list)
+                       `(cl-typep ,temp ',(car c))))
+                (or (cdr c) '(nil))))
         clauses)))))
 
 ;;;###autoload
@@ -901,7 +900,8 @@ This is compatible with Common Lisp, but note that `defun' and
   "The Common Lisp `loop' macro.
 Valid clauses include:
   For clauses:
-    for VAR from/upfrom/downfrom EXPR1 to/upto/downto/above/below EXPR2 [by EXPR3]
+    for VAR from/upfrom/downfrom EXPR1 to/upto/downto/above/below EXPR2
+        [by EXPR3]
     for VAR = EXPR1 then EXPR2
     for VAR in/on/in-ref LIST [by FUNC]
     for VAR across/across-ref ARRAY
@@ -1317,13 +1317,12 @@ For more details, see Info node `(cl)Loop Facility'.
 
 	       ((memq word '(across across-ref))
 		(let ((temp-vec (make-symbol "--cl-vec--"))
-                      (temp-len (make-symbol "--cl-len--"))
 		      (temp-idx (make-symbol "--cl-idx--")))
 		  (push (list temp-vec (pop cl--loop-args)) loop-for-bindings)
-		  (push (list temp-len `(length ,temp-vec)) loop-for-bindings)
 		  (push (list temp-idx -1) loop-for-bindings)
+                  (push `(setq ,temp-idx (1+ ,temp-idx)) cl--loop-body)
 		  (cl--push-clause-loop-body
-                   `(< (setq ,temp-idx (1+ ,temp-idx)) ,temp-len))
+                   `(< ,temp-idx (length ,temp-vec)))
 		  (if (eq word 'across-ref)
 		      (push (list var `(aref ,temp-vec ,temp-idx))
 			    cl--loop-symbol-macs)
@@ -1337,7 +1336,6 @@ For more details, see Info node `(cl)Loop Facility'.
 				    (error "Expected `of'"))))
 		      (seq (cl--pop2 cl--loop-args))
 		      (temp-seq (make-symbol "--cl-seq--"))
-	              (temp-len (make-symbol "--cl-len--"))
 		      (temp-idx
                        (if (eq (car cl--loop-args) 'using)
                            (if (and (= (length (cadr cl--loop-args)) 2)
@@ -1348,19 +1346,16 @@ For more details, see Info node `(cl)Loop Facility'.
 		  (push (list temp-seq seq) loop-for-bindings)
 		  (push (list temp-idx 0) loop-for-bindings)
 		  (if ref
-                      (progn
+                      (let ((temp-len (make-symbol "--cl-len--")))
 			(push (list temp-len `(length ,temp-seq))
 			      loop-for-bindings)
 			(push (list var `(elt ,temp-seq ,temp-idx))
 			      cl--loop-symbol-macs)
-			(cl--push-clause-loop-body `(< ,temp-idx ,temp-len)))
-                    ;; Evaluate seq length just if needed, that is, when seq is not a cons.
-                    (push (list temp-len (or (consp seq) `(length ,temp-seq)))
-			  loop-for-bindings)
+                        (cl--push-clause-loop-body `(< ,temp-idx ,temp-len)))
 		    (push (list var nil) loop-for-bindings)
 		    (cl--push-clause-loop-body `(and ,temp-seq
                                                      (or (consp ,temp-seq)
-                                                         (< ,temp-idx ,temp-len))))
+                                                         (< ,temp-idx (length ,temp-seq)))))
 		    (push (list var `(if (consp ,temp-seq)
                                          (pop ,temp-seq)
                                        (aref ,temp-seq ,temp-idx)))
@@ -2021,7 +2016,12 @@ info node `(cl) Function Bindings' for details.
 
 \(fn ((FUNC ARGLIST BODY...) ...) FORM...)"
   (declare (indent 1)
-           (debug ((&rest [&or (&define name function-form) (cl-defun)])
+           (debug ((&rest [&or (&define name :unique "cl-flet@" function-form)
+                               (&define name :unique "cl-flet@"
+                                        cl-lambda-list
+                                        cl-declarations-or-string
+                                        [&optional ("interactive" interactive)]
+                                        def-body)])
                    cl-declarations body)))
   (let ((binds ()) (newenv macroexpand-all-environment))
     (dolist (binding bindings)
@@ -2060,10 +2060,99 @@ Like `cl-flet' but the definitions can refer to previous ones.
    ((null (cdr bindings)) `(cl-flet ,bindings ,@body))
    (t `(cl-flet (,(pop bindings)) (cl-flet* ,bindings ,@body)))))
 
+(defun cl--self-tco (var fargs body)
+  ;; This tries to "optimize" tail calls for the specific case
+  ;; of recursive self-calls by replacing them with a `while' loop.
+  ;; It is quite far from a general tail-call optimization, since it doesn't
+  ;; even handle mutually recursive functions.
+  (letrec
+      ((done nil) ;; Non-nil if some TCO happened.
+       (retvar (make-symbol "retval"))
+       (ofargs (mapcar (lambda (s) (if (memq s cl--lambda-list-keywords) s
+                                (make-symbol (symbol-name s))))
+                       fargs))
+       (opt-exps (lambda (exps) ;; `exps' is in tail position!
+                   (append (butlast exps)
+                           (list (funcall opt (car (last exps)))))))
+       (opt
+        (lambda (exp) ;; `exp' is in tail position!
+          (pcase exp
+            ;; FIXME: Optimize `apply'?
+            (`(funcall ,(pred (eq var)) . ,aargs)
+             ;; This is a self-recursive call in tail position.
+             (let ((sets nil)
+                   (fargs ofargs))
+               (while fargs
+                 (pcase (pop fargs)
+                   ('&rest
+                    (push (pop fargs) sets)
+                    (push `(list . ,aargs) sets)
+                    ;; (cl-assert (null fargs))
+                    )
+                   ('&optional nil)
+                   (farg
+                    (push farg sets)
+                    (push (pop aargs) sets))))
+               (setq done t)
+               `(progn (setq . ,(nreverse sets))
+                       :recurse)))
+            (`(progn . ,exps) `(progn . ,(funcall opt-exps exps)))
+            (`(if ,cond ,then . ,else)
+             `(if ,cond ,(funcall opt then) . ,(funcall opt-exps else)))
+            (`(cond . ,conds)
+             (let ((cs '()))
+               (while conds
+                 (pcase (pop conds)
+                   (`(,exp)
+                    (push (if conds
+                              ;; This returns the value of `exp' but it's
+                              ;; only in tail position if it's the
+                              ;; last condition.
+                              `((setq ,retvar ,exp) nil)
+                            `(,(funcall opt exp)))
+                          cs))
+                   (exps
+                    (push (funcall opt-exps exps) cs))))
+               (if (eq t (caar cs))
+                   `(cond . ,(nreverse cs))
+                 `(cond ,@(nreverse cs) (t (setq ,retvar nil))))))
+            ((and `(,(or 'let 'let*) ,bindings . ,exps)
+                  (guard
+                   ;; Note: it's OK for this `let' to shadow any
+                   ;; of the formal arguments since we will only
+                   ;; setq the fresh new `ofargs' vars instead ;-)
+                   (let ((shadowings
+                          (mapcar (lambda (b) (if (consp b) (car b) b)) bindings)))
+                     ;; If `var' is shadowed, then it clearly can't be
+                     ;; tail-called any more.
+                     (not (memq var shadowings)))))
+             `(,(car exp) ,bindings . ,(funcall opt-exps exps)))
+            (_
+             `(progn (setq ,retvar ,exp) nil))))))
+
+    (let ((optimized-body (funcall opt-exps body)))
+      (if (not done)
+          (cons fargs body)
+        ;; We use two sets of vars: `ofargs' and `fargs' because we need
+        ;; to be careful that if a closure captures a formal argument
+        ;; in one iteration, it needs to capture a different binding
+        ;; then that of other iterations, e.g.
+        (cons
+         ofargs
+         `((let (,retvar)
+             (while (let ,(delq nil
+                                (cl-mapcar
+                                 (lambda (a oa)
+                                   (unless (memq a cl--lambda-list-keywords)
+                                     (list a oa)))
+                                 fargs ofargs))
+                      . ,optimized-body))
+             ,retvar)))))))
+
 ;;;###autoload
 (defmacro cl-labels (bindings &rest body)
-    "Make local (recursive) function definitions.
-Each definition can take the form (FUNC ARGLIST BODY...) where
+  "Make local (recursive) function definitions.
++BINDINGS is a list of definitions of the form (FUNC ARGLIST BODY...) where
 FUNC is the function name, ARGLIST its arguments, and BODY the
 forms of the function body.  FUNC is defined in any BODY, as well
 as FORM, so you can write recursive and mutually recursive
@@ -2075,17 +2164,33 @@ details.
   (let ((binds ()) (newenv macroexpand-all-environment))
     (dolist (binding bindings)
       (let ((var (make-symbol (format "--cl-%s--" (car binding)))))
-	(push (list var `(cl-function (lambda . ,(cdr binding)))) binds)
+	(push (cons var (cdr binding)) binds)
 	(push (cons (car binding)
                     (lambda (&rest args)
                       (if (eq (car args) cl--labels-magic)
                           (list cl--labels-magic var)
                         (cl-list* 'funcall var args))))
               newenv)))
-    (macroexpand-all `(letrec ,(nreverse binds) ,@body)
-                     ;; Don't override lexical-let's macro-expander.
-                     (if (assq 'function newenv) newenv
-                       (cons (cons 'function #'cl--labels-convert) newenv)))))
+    ;; Don't override lexical-let's macro-expander.
+    (unless (assq 'function newenv)
+      (push (cons 'function #'cl--labels-convert) newenv))
+    ;; Perform self-tail call elimination.
+    (setq binds (mapcar
+                 (lambda (bind)
+                   (pcase-let*
+                       ((`(,var ,sargs . ,sbody) bind)
+                        (`(function (lambda ,fargs . ,ebody))
+                         (macroexpand-all `(cl-function (lambda ,sargs . ,sbody))
+                                          newenv))
+                        (`(,ofargs . ,obody)
+                         (cl--self-tco var fargs ebody)))
+                     `(,var (function (lambda ,ofargs . ,obody)))))
+                 (nreverse binds)))
+    `(letrec ,binds
+       . ,(macroexp-unprogn
+           (macroexpand-all
+            (macroexp-progn body)
+            newenv)))))
 
 ;; The following ought to have a better definition for use with newer
 ;; byte compilers.
@@ -2699,9 +2804,9 @@ Each SLOT may instead take the form (SNAME SDEFAULT SOPTIONS...), where
 SDEFAULT is the default value of that slot and SOPTIONS are keyword-value
 pairs for that slot.
 Supported keywords for slots are:
-- `:read-only':  If this has a non-nil value, that slot cannot be set via `setf'.
+- `:read-only': If this has a non-nil value, that slot cannot be set via `setf'.
 - `:documentation': this is a docstring describing the slot.
-- `:type': the type of the field; currently unused.
+- `:type': the type of the field; currently only used for documentation.
 
 \(fn NAME &optional DOCSTRING &rest SLOTS)"
   (declare (doc-string 2) (indent 1)
@@ -2763,7 +2868,7 @@ Supported keywords for slots are:
     (unless (cl--struct-name-p name)
       (signal 'wrong-type-argument (list 'cl-struct-name-p name 'name)))
     (setq descs (cons '(cl-tag-slot)
-		      (mapcar (function (lambda (x) (if (consp x) x (list x))))
+                      (mapcar (lambda (x) (if (consp x) x (list x)))
 			      descs)))
     (while opts
       (let ((opt (if (consp (car opts)) (caar opts) (car opts)))
@@ -2790,9 +2895,8 @@ Supported keywords for slots are:
                ;; we include EIEIO classes rather than cl-structs!
                (when include-name (error "Can't :include more than once"))
                (setq include-name (car args))
-               (setq include-descs (mapcar (function
-                                            (lambda (x)
-                                              (if (consp x) x (list x))))
+               (setq include-descs (mapcar (lambda (x)
+                                             (if (consp x) x (list x)))
                                            (cdr args))))
 	      ((eq opt :print-function)
 	       (setq print-func (car args)))
@@ -2868,7 +2972,9 @@ Supported keywords for slots are:
                     (append pred-form '(t))
                   `(and ,pred-form t)))
             forms)
-      (push `(put ',name 'cl-deftype-satisfies ',predicate) forms))
+      (push `(eval-and-compile
+               (put ',name 'cl-deftype-satisfies ',predicate))
+            forms))
     (let ((pos 0) (descp descs))
       (while descp
 	(let* ((desc (pop descp))
@@ -2967,15 +3073,27 @@ Supported keywords for slots are:
               constrs))
     (pcase-dolist (`(,cname ,args ,doc) constrs)
       (let* ((anames (cl--arglist-args args))
-	     (make (cl-mapcar (function (lambda (s d) (if (memq s anames) s d)))
-			    slots defaults)))
-	(push `(,cldefsym ,cname
+             (make (cl-mapcar (lambda (s d) (if (memq s anames) s d))
+			      slots defaults))
+	     ;; `cl-defsubst' is fundamentally broken: it substitutes
+             ;; its arguments into the body's `sexp' much too naively
+             ;; when inlinling, which results in various problems.
+             ;; For example it generates broken code if your
+             ;; argument's name happens to be the same as some
+             ;; function used within the body.
+             ;; E.g. (cl-defsubst sm-foo (list) (list list))
+             ;; will expand `(sm-foo 1)' to `(1 1)' rather than to `(list t)'!
+             ;; Try to catch this known case!
+	     (con-fun (or type #'record))
+	     (unsafe-cl-defsubst
+	      (or (memq con-fun args) (assq con-fun args))))
+	(push `(,(if unsafe-cl-defsubst 'cl-defun cldefsym) ,cname
                    (&cl-defs (nil ,@descs) ,@args)
                  ,(if (stringp doc) doc
                     (format "Constructor for objects of type `%s'." name))
                  ,@(if (cl--safe-expr-p `(progn ,@(mapcar #'cl-second descs)))
                        '((declare (side-effect-free t))))
-                 (,(or type #'record) ,@make))
+                 (,con-fun ,@make))
               forms)))
     (if print-auto (nconc print-func (list '(princ ")" cl-s) t)))
     ;; Don't bother adding to cl-custom-print-functions since it's not used
@@ -3104,7 +3222,7 @@ slots skipped by :initial-offset may appear in the list."
               descs)))
     (nreverse descs)))
 
-(define-error 'cl-struct-unknown-slot "struct %S has no slot %S")
+(define-error 'cl-struct-unknown-slot "struct has no slot")
 
 (defun cl-struct-slot-offset (struct-type slot-name)
   "Return the offset of slot SLOT-NAME in STRUCT-TYPE.
@@ -3129,22 +3247,30 @@ Of course, we really can't know that for sure, so it's just a heuristic."
                (cdr (assq sym byte-compile-macro-environment))))))
 
 (pcase-dolist (`(,type . ,pred)
-               '((null		. null)
+               ;; Mostly kept in alphabetical order.
+               '((array		. arrayp)
                  (atom		. atom)
-                 (real		. numberp)
-                 (fixnum	. integerp)
                  (base-char	. characterp)
+                 (boolean	. booleanp)
+                 (bool-vector	. bool-vector-p)
+                 (buffer	. bufferp)
                  (character	. natnump)
-                 ;; "Obvious" mappings.
-                 (string	. stringp)
-                 (list		. listp)
-                 (symbol	. symbolp)
+                 (char-table	. char-table-p)
+                 (hash-table	. hash-table-p)
+                 (cons		. consp)
+                 (fixnum	. integerp)
+                 (float		. floatp)
                  (function	. functionp)
                  (integer	. integerp)
-                 (float		. floatp)
-                 (boolean	. booleanp)
+                 (keyword	. keywordp)
+                 (list		. listp)
+                 (number	. numberp)
+                 (null		. null)
+                 (real		. numberp)
+                 (sequence	. sequencep)
+                 (string	. stringp)
+                 (symbol	. symbolp)
                  (vector	. vectorp)
-                 (array		. arrayp)
                  ;; FIXME: Do we really want to consider this a type?
                  (integer-or-marker . integer-or-marker-p)
                  ))
@@ -3362,8 +3488,8 @@ macro that returns its `&whole' argument."
   (put y 'side-effect-free t))
 
 ;;; Things that are inline.
-(cl-proclaim '(inline cl-acons cl-map cl-concatenate cl-notany
-               cl-notevery cl-revappend cl-nreconc gethash))
+(cl-proclaim '(inline cl-acons cl-map cl-notany cl-notevery cl-revappend
+                      cl-nreconc gethash))
 
 ;;; Things that are side-effect-free.
 (mapc (lambda (x) (function-put x 'side-effect-free t))
@@ -3408,6 +3534,8 @@ STRUCT and SLOT-NAME are symbols.  INST is a structure instance."
            (nth (cl-struct-slot-offset ,struct-type ,slot-name) ,inst)
          (aref ,inst (cl-struct-slot-offset ,struct-type ,slot-name)))))))
 
+(make-obsolete-variable 'cl-macs-load-hook
+                        "use `with-eval-after-load' instead." "28.1")
 (run-hooks 'cl-macs-load-hook)
 
 ;; Local variables:

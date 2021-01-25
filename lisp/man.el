@@ -1,6 +1,6 @@
 ;;; man.el --- browse UNIX manual pages -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993-1994, 1996-1997, 2001-2020 Free Software
+;; Copyright (C) 1993-1994, 1996-1997, 2001-2021 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Barry A. Warsaw <bwarsaw@cen.com>
@@ -90,7 +90,6 @@
 
 (require 'ansi-color)
 (require 'cl-lib)
-(require 'button)
 
 (defgroup man nil
   "Browse UNIX manual pages."
@@ -836,7 +835,8 @@ POS defaults to `point'."
 ;; ======================================================================
 ;; Top level command and background process sentinel
 
-;; For compatibility with older versions.
+;; This alias was originally for compatibility with older versions.
+;; Some users got used to having it, so we will not remove it.
 ;;;###autoload
 (defalias 'manual-entry 'man)
 
@@ -926,15 +926,18 @@ foo(sec)[, bar(sec) [, ...]] [other stuff] - description"
             ;; run differently in Man-getpage-in-background, an error
             ;; here may not necessarily mean that we'll also get an
             ;; error later.
-	    (ignore-errors
-	      (call-process manual-program nil '(t nil) nil
-			    "-k" (concat (when (or Man-man-k-use-anchor
-						   (string-equal prefix ""))
-					   "^")
-					 prefix))))
-	  (setq table (Man-parse-man-k)))
+            (when (eq 0
+                      (ignore-errors
+                        (call-process
+                         manual-program nil '(t nil) nil
+                         "-k" (concat (when (or Man-man-k-use-anchor
+                                                (string-equal prefix ""))
+                                        "^")
+                                      prefix))))
+              (setq table (Man-parse-man-k)))))
 	;; Cache the table for later reuse.
-	(setq Man-completion-cache (cons prefix table)))
+        (when table
+          (setq Man-completion-cache (cons prefix table))))
       ;; The table may contain false positives since the match is made
       ;; by "man -k" not just on the manpage's name.
       (if section
@@ -996,7 +999,11 @@ An \"apropos\" query with -k gives a buffer of matching page
 names or descriptions.  The pattern argument is usually an
 \"grep -E\" style regexp.
 
-    -k pattern"
+    -k pattern
+
+Note that in some cases you will need to use \\[quoted-insert] to quote the
+SPC character in the above examples, because this command attempts
+to auto-complete your input based on the installed manual pages."
 
   (interactive
    (list (let* ((default-entry (Man-default-man-entry))
@@ -1009,10 +1016,9 @@ names or descriptions.  The pattern argument is usually an
 		(completion-ignore-case t)
 		Man-completion-cache    ;Don't cache across calls.
 		(input (completing-read
-			(format "Manual entry%s"
-				(if (string= default-entry "")
-				    ": "
-				  (format " (default %s): " default-entry)))
+			(format-prompt "Manual entry"
+                                       (and (not (equal default-entry ""))
+                                            default-entry))
                         'Man-completion-table
 			nil nil nil 'Man-topic-history default-entry)))
 	   (if (string= input "")
@@ -1102,7 +1108,6 @@ Return the buffer in which the manpage will appear."
 	 (buffer  (get-buffer bufname)))
     (if buffer
 	(Man-notify-when-ready buffer)
-      (require 'env)
       (message "Invoking %s %s in the background" manual-program man-args)
       (setq buffer (generate-new-buffer bufname))
       (with-current-buffer buffer
@@ -1392,7 +1397,7 @@ synchronously, PROCESS is the name of the buffer where the manpage
 command is run.  Second argument STRING is the entire string of output."
   (save-excursion
     (let ((Man-buffer (process-buffer process)))
-      (if (null (buffer-name Man-buffer)) ;; deleted buffer
+      (if (not (buffer-live-p Man-buffer)) ;; deleted buffer
 	  (set-process-buffer process nil)
 
 	(with-current-buffer Man-buffer
@@ -1426,7 +1431,7 @@ manpage command."
 	(delete-buff nil)
 	message)
 
-    (if (null (buffer-name Man-buffer)) ;; deleted buffer
+    (if (not (buffer-live-p Man-buffer)) ;; deleted buffer
 	(or (stringp process)
 	    (set-process-buffer process nil))
 
@@ -1504,8 +1509,11 @@ manpage command."
 
       (when delete-buff
         (if (window-live-p (get-buffer-window Man-buffer t))
-            (quit-restore-window
-             (get-buffer-window Man-buffer t) 'kill)
+            (progn
+              (quit-restore-window
+               (get-buffer-window Man-buffer t) 'kill)
+              ;; Ensure that we end up in the correct window.
+              (select-window (old-selected-window)))
           (kill-buffer Man-buffer)))
 
       (when message
@@ -1537,8 +1545,8 @@ The following man commands are available in the buffer.  Try
 
 \\[man]       Prompt to retrieve a new manpage.
 \\[Man-follow-manual-reference]       Retrieve reference in SEE ALSO section.
-\\[Man-next-manpage]   Jump to next manpage in circular list.
-\\[Man-previous-manpage]   Jump to previous manpage in circular list.
+\\[Man-next-manpage]     Jump to next manpage in circular list.
+\\[Man-previous-manpage]     Jump to previous manpage in circular list.
 \\[Man-next-section]       Jump to next manpage section.
 \\[Man-previous-section]       Jump to previous manpage section.
 \\[Man-goto-section]       Go to a manpage section.
@@ -1575,10 +1583,10 @@ The following key bindings are currently in effect in the buffer:
   (auto-fill-mode -1)
   (setq imenu-generic-expression (list (list nil Man-heading-regexp 0)))
   (imenu-add-to-menubar man-imenu-title)
-  (set (make-local-variable 'outline-regexp) Man-heading-regexp)
-  (set (make-local-variable 'outline-level) (lambda () 1))
-  (set (make-local-variable 'bookmark-make-record-function)
-       'Man-bookmark-make-record)
+  (setq-local outline-regexp Man-heading-regexp)
+  (setq-local outline-level (lambda () 1))
+  (setq-local bookmark-make-record-function
+              #'Man-bookmark-make-record)
   (add-hook 'window-state-change-functions #'Man--window-state-change nil t))
 
 (defun Man-build-section-list ()

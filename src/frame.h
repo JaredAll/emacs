@@ -1,5 +1,5 @@
 /* Define frame-object for GNU Emacs.
-   Copyright (C) 1993-1994, 1999-2020 Free Software Foundation, Inc.
+   Copyright (C) 1993-1994, 1999-2021 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -1361,6 +1361,7 @@ extern bool frame_inhibit_resize (struct frame *, bool, Lisp_Object);
 extern void adjust_frame_size (struct frame *, int, int, int, bool, Lisp_Object);
 extern void frame_size_history_add (struct frame *f, Lisp_Object fun_symbol,
 				    int width, int height, Lisp_Object rest);
+extern Lisp_Object mouse_position (bool);
 
 extern Lisp_Object Vframe_list;
 
@@ -1450,6 +1451,49 @@ FRAME_BOTTOM_DIVIDER_WIDTH (struct frame *f)
 {
   return frame_dimension (f->bottom_divider_width);
 }
+
+/* Return a non-null pointer to the cached face with ID on frame F.  */
+
+INLINE struct face *
+FACE_FROM_ID (struct frame *f, int id)
+{
+  eassert (0 <= id && id < FRAME_FACE_CACHE (f)->used);
+  return FRAME_FACE_CACHE (f)->faces_by_id[id];
+}
+
+/* Return a pointer to the face with ID on frame F, or null if such a
+   face doesn't exist.  */
+
+INLINE struct face *
+FACE_FROM_ID_OR_NULL (struct frame *f, int id)
+{
+  int used = FRAME_FACE_CACHE (f)->used;
+  eassume (0 <= used);
+  return 0 <= id && id < used ? FRAME_FACE_CACHE (f)->faces_by_id[id] : NULL;
+}
+
+#ifdef HAVE_WINDOW_SYSTEM
+
+/* A non-null pointer to the image with id ID on frame F.  */
+
+INLINE struct image *
+IMAGE_FROM_ID (struct frame *f, int id)
+{
+  eassert (0 <= id && id < FRAME_IMAGE_CACHE (f)->used);
+  return FRAME_IMAGE_CACHE (f)->images[id];
+}
+
+/* Value is a pointer to the image with id ID on frame F, or null if
+   no image with that id exists.  */
+
+INLINE struct image *
+IMAGE_OPT_FROM_ID (struct frame *f, int id)
+{
+  int used = FRAME_IMAGE_CACHE (f)->used;
+  eassume (0 <= used);
+  return 0 <= id && id < used ? FRAME_IMAGE_CACHE (f)->images[id] : NULL;
+}
+#endif
 
 /***********************************************************************
 	    Conversion between canonical units and pixels

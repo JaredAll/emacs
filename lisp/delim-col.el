@@ -1,9 +1,9 @@
 ;;; delim-col.el --- prettify all columns in a region or rectangle  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1999-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2021 Free Software Foundation, Inc.
 
 ;; Author: Vinicius Jose Latorre <viniciusjl.gnu@gmail.com>
-;; Version: 2.1
+;; Old-Version: 2.1
 ;; Keywords: convenience text
 ;; X-URL: https://www.emacswiki.org/emacs/ViniciusJoseLatorre
 

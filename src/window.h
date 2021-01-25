@@ -1,5 +1,5 @@
 /* Window definitions for GNU Emacs.
-   Copyright (C) 1985-1986, 1993, 1995, 1997-2020 Free Software
+   Copyright (C) 1985-1986, 1993, 1995, 1997-2021 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -1124,10 +1124,6 @@ extern Lisp_Object echo_area_window;
 
 extern EMACS_INT command_loop_level;
 
-/* Depth in minibuffer invocations.  */
-
-extern EMACS_INT minibuf_level;
-
 /* Non-zero if we should redraw the mode lines on the next redisplay.
    Usually set to a unique small integer so we can track the main causes of
    full redisplays in `redisplay--mode-lines-cause'.  */
@@ -1202,7 +1198,6 @@ extern bool window_outdated (struct window *);
 extern void init_window_once (void);
 extern void init_window (void);
 extern void syms_of_window (void);
-extern void keys_of_window (void);
 /* Move cursor to row/column position VPOS/HPOS, pixel coordinates
    Y/X. HPOS/VPOS are window-relative row and column numbers and X/Y
    are window-relative pixel positions.  This is always done during

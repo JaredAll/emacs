@@ -167,7 +167,7 @@ CC Mode
 @copying
 This manual is for CC Mode in Emacs.
 
-Copyright @copyright{} 1995--2020 Free Software Foundation, Inc.
+Copyright @copyright{} 1995--2021 Free Software Foundation, Inc.
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -197,7 +197,7 @@ modify this GNU manual.''
 @titlepage
 @sp 10
 
-@center @titlefont{CC Mode 5.34}
+@center @titlefont{CC Mode 5.35}
 @sp 2
 @center A GNU Emacs mode for editing C and C-like languages
 @sp 2
@@ -388,7 +388,7 @@ was added in version 5.30.
 
 This manual describes @ccmode{}
 @comment The following line must appear on its own, so that the
-version 5.34.
+version 5.35.
 @comment Release.py script can update the version number automatically
 
 @ccmode{} supports the editing of C, C++, Objective-C,
@@ -1024,9 +1024,7 @@ These key sequences are not bound in AWK Mode, which doesn't have
 preprocessor statements.
 
 @item @kbd{M-x c-backward-into-nomenclature}
-@itemx @kbd{M-x c-forward-into-nomenclature}
 @findex c-backward-into-nomenclature
-@findex c-forward-into-nomenclature
 @findex backward-into-nomenclature @r{(c-)}
 @findex forward-into-nomenclature @r{(c-)}
 A popular programming style, especially for object-oriented languages
@@ -2132,6 +2130,11 @@ For Pike autodoc markup, the standard in Pike.
 @item gtkdoc
 @cindex GtkDoc markup
 For GtkDoc markup, widely used in the Gnome community.
+
+@item doxygen
+@cindex Doxygen markup
+For Doxygen markup, which can be used with C, C++, Java and variety of
+other languages.
 @end table
 
 The above is by no means complete.  If you'd like to see support for
@@ -6386,6 +6389,26 @@ function is the same as specifying a list @code{(c-lineup-assignments
 
 @workswith @code{topmost-intro-cont}, @code{statement-cont},
 @code{arglist-cont}, @code{arglist-cont-nonempty}.
+@end defun
+
+@comment ------------------------------------------------------------
+
+@defun c-lineup-ternary-bodies
+@findex lineup-ternary-bodies @r{(c-)}
+Line up true and false branches of a ternary operator
+(i.e. @code{?:}).  More precisely, if the line starts with a colon
+which is a part of a said operator, align it with corresponding
+question mark.  For example:
+
+@example
+@group
+return arg % 2 == 0 ? arg / 2
+                    : (3 * arg + 1);    @hereFn{c-lineup-ternary-bodies}
+@end group
+@end example
+
+@workswith @code{arglist-cont}, @code{arglist-cont-nonempty} and
+@code{statement-cont}.
 @end defun
 
 @comment ------------------------------------------------------------

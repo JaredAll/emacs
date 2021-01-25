@@ -1,6 +1,6 @@
 ;;; semantic/sort.el --- Utilities for sorting and re-arranging tag tables.
 
-;;; Copyright (C) 1999-2005, 2007-2020 Free Software Foundation, Inc.
+;;; Copyright (C) 1999-2005, 2007-2021 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: syntax
@@ -46,11 +46,7 @@
 (defun semantic-string-lessp-ci (s1 s2)
   "Case insensitive version of `string-lessp'.
 Argument S1 and S2 are the strings to compare."
-  ;; Use downcase instead of upcase because an average name
-  ;; has more lower case characters.
-  (if (fboundp 'compare-strings)
-      (eq (compare-strings s1 0 nil s2 0 nil t) -1)
-    (string-lessp (downcase s1) (downcase s2))))
+  (eq (compare-strings s1 0 nil s2 0 nil t) -1))
 
 (defun semantic-sort-tag-type (tag)
   "Return a type string for TAG guaranteed to be a string."

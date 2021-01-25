@@ -1,6 +1,6 @@
 ;;; goto-addr.el --- click to browse URL or to send to e-mail address
 
-;; Copyright (C) 1995, 2000-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1995, 2000-2021 Free Software Foundation, Inc.
 
 ;; Author: Eric Ding <ericding@alum.mit.edu>
 ;; Maintainer: emacs-devel@gnu.org
@@ -279,6 +279,16 @@ Also fontifies the buffer appropriately (see `goto-address-fontify-p' and
     (save-restriction
       (widen)
       (goto-address-unfontify (point-min) (point-max)))))
+
+(defun goto-addr-mode--turn-on ()
+  (when (not goto-address-mode)
+    (goto-address-mode 1)))
+
+;;;###autoload
+(define-globalized-minor-mode global-goto-address-mode
+  goto-address-mode goto-addr-mode--turn-on
+  :group 'goto-address
+  :version "28.1")
 
 ;;;###autoload
 (define-minor-mode goto-address-prog-mode

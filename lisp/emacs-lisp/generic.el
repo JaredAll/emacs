@@ -1,6 +1,6 @@
 ;;; generic.el --- defining simple major modes with comment and font-lock
 ;;
-;; Copyright (C) 1997, 1999, 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 1999, 2001-2021 Free Software Foundation, Inc.
 ;;
 ;; Author: Peter Breton <pbreton@cs.umb.edu>
 ;; Created: Fri Sep 27 1996
@@ -115,6 +115,10 @@ instead (which see).")
 				    font-lock-list auto-mode-list
 				    function-list &optional docstring)
   "Create a new generic mode MODE.
+
+A \"generic\" mode is a simple major mode with basic support for
+comment syntax and Font Lock mode, but otherwise does not have
+any special keystrokes or functionality available.
 
 MODE is the name of the command for the generic mode; don't quote it.
 The optional DOCSTRING is the documentation for the mode command.  If

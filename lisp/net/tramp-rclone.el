@@ -1,6 +1,6 @@
 ;;; tramp-rclone.el --- Tramp access functions to cloud storages  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2018-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2018-2021 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
@@ -135,6 +135,8 @@
     (start-file-process . ignore)
     (substitute-in-file-name . tramp-handle-substitute-in-file-name)
     (temporary-file-directory . tramp-handle-temporary-file-directory)
+    (tramp-get-remote-gid . ignore)
+    (tramp-get-remote-uid . ignore)
     (tramp-set-file-uid-gid . ignore)
     (unhandled-file-name-directory . ignore)
     (vc-registered . ignore)
@@ -287,19 +289,19 @@ file names."
     (directory &optional recursive trash)
   "Like `delete-directory' for Tramp files."
   (with-parsed-tramp-file-name (expand-file-name directory) nil
-    (delete-directory (tramp-rclone-local-file-name directory) recursive trash)
     (tramp-flush-directory-properties v localname)
-    (tramp-rclone-flush-directory-cache v)))
+    (tramp-rclone-flush-directory-cache v)
+    (delete-directory (tramp-rclone-local-file-name directory) recursive trash)))
 
 (defun tramp-rclone-handle-delete-file (filename &optional trash)
   "Like `delete-file' for Tramp files."
   (with-parsed-tramp-file-name (expand-file-name filename) nil
+    (tramp-rclone-flush-directory-cache v)
     (delete-file (tramp-rclone-local-file-name filename) trash)
-    (tramp-flush-file-properties v localname)
-    (tramp-rclone-flush-directory-cache v)))
+    (tramp-flush-file-properties v localname)))
 
 (defun tramp-rclone-handle-directory-files
-    (directory &optional full match nosort)
+    (directory &optional full match nosort count)
   "Like `directory-files' for Tramp files."
   (unless (file-exists-p directory)
     (tramp-error
@@ -309,8 +311,8 @@ file names."
     (setq directory (file-name-as-directory (expand-file-name directory)))
     (with-parsed-tramp-file-name directory nil
       (let ((result
-	     (directory-files
-	      (tramp-rclone-local-file-name directory) full match)))
+	     (tramp-compat-directory-files
+	      (tramp-rclone-local-file-name directory) full match nosort count)))
 	;; Massage the result.
 	(when full
 	  (let ((local (concat "^" (regexp-quote (tramp-rclone-mount-point v))))
@@ -457,7 +459,7 @@ file names."
     ;; to cache a nil result.
     (or (tramp-get-connection-property
 	 (tramp-get-connection-process vec) "mounted" nil)
-	(let* ((default-directory temporary-file-directory)
+	(let* ((default-directory (tramp-compat-temporary-file-directory))
 	       (mount (shell-command-to-string "mount -t fuse.rclone")))
 	  (tramp-message vec 6 "%s" "mount -t fuse.rclone")
 	  (tramp-message vec 6 "\n%s" mount)
@@ -477,7 +479,19 @@ file names."
 	   (with-tramp-connection-property
 	       (tramp-get-connection-process vec) "rclone-pid"
 	     (catch 'pid
-	       (dolist (pid (list-system-processes)) ;; "pidof rclone" ?
+	       (dolist
+		   (pid
+		    ;; Until Emacs 25, `process-attributes' could
+		    ;; crash Emacs for some processes.  So we use
+		    ;; "pidof", which might not work everywhere.
+		    (if (<= emacs-major-version 25)
+			(let ((default-directory
+				(tramp-compat-temporary-file-directory)))
+			  (mapcar
+			   #'string-to-number
+			   (split-string
+			    (shell-command-to-string "pidof rclone"))))
+		      (list-system-processes)))
 		 (and (string-match-p
 		       (regexp-quote
 			(format "rclone mount %s:" (tramp-file-name-host vec)))

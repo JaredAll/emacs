@@ -1,6 +1,6 @@
 /* Generic frame functions.
 
-Copyright (C) 1993-1995, 1997, 1999-2020 Free Software Foundation, Inc.
+Copyright (C) 1993-1995, 1997, 1999-2021 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -35,7 +35,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 /* These help us bind and responding to switch-frame events.  */
 #include "keyboard.h"
-#include "ptr-bounds.h"
 #include "frame.h"
 #include "blockinput.h"
 #include "termchar.h"
@@ -932,18 +931,18 @@ make_frame (bool mini_p)
 
   wset_frame (rw, frame);
 
-  /* 10 is arbitrary,
+  /* 80/25 is arbitrary,
      just so that there is "something there."
      Correct size will be set up later with adjust_frame_size.  */
 
-  SET_FRAME_COLS (f, 10);
-  SET_FRAME_LINES (f, 10);
+  SET_FRAME_COLS (f, 80);
+  SET_FRAME_LINES (f, 25);
   SET_FRAME_WIDTH (f, FRAME_COLS (f) * FRAME_COLUMN_WIDTH (f));
   SET_FRAME_HEIGHT (f, FRAME_LINES (f) * FRAME_LINE_HEIGHT (f));
 
-  rw->total_cols = 10;
+  rw->total_cols = FRAME_COLS (f);
   rw->pixel_width = rw->total_cols * FRAME_COLUMN_WIDTH (f);
-  rw->total_lines = mini_p ? 9 : 10;
+  rw->total_lines = FRAME_LINES (f) - (mini_p ? 1 : 0);
   rw->pixel_height = rw->total_lines * FRAME_LINE_HEIGHT (f);
 
   if (mini_p)
@@ -1102,7 +1101,7 @@ make_initial_frame (void)
 
   terminal = init_initial_terminal ();
 
-  f = make_frame (1);
+  f = make_frame (true);
   XSETFRAME (frame, f);
 
   Vframe_list = Fcons (frame, Vframe_list);
@@ -1427,11 +1426,15 @@ do_switch_frame (Lisp_Object frame, int track, int for_deletion, Lisp_Object nor
       if (FRAMEP (gfocus))
 	{
 	  focus = FRAME_FOCUS_FRAME (XFRAME (gfocus));
-	  if ((FRAMEP (focus) && XFRAME (focus) == SELECTED_FRAME ())
+	  if (FRAMEP (focus) && XFRAME (focus) == SELECTED_FRAME ())
 	      /* Redirect frame focus also when FRAME has its minibuffer
-		 window on the selected frame (see Bug#24500).  */
+		 window on the selected frame (see Bug#24500).
+
+		 Don't do that: It causes redirection problem with a
+		 separate minibuffer frame (Bug#24803) and problems
+		 when updating the cursor on such frames.
 	      || (NILP (focus)
-		  && EQ (FRAME_MINIBUF_WINDOW (f), sf->selected_window)))
+		  && EQ (FRAME_MINIBUF_WINDOW (f), sf->selected_window)))  */
 	    Fredirect_frame_focus (gfocus, frame);
 	}
     }
@@ -1483,6 +1486,7 @@ do_switch_frame (Lisp_Object frame, int track, int for_deletion, Lisp_Object nor
 #endif
     internal_last_event_frame = Qnil;
 
+  move_minibuffer_onto_frame ();
   return frame;
 }
 
@@ -2435,6 +2439,12 @@ passing the normal return value to that function as an argument,
 and returns whatever that function returns.  */)
   (void)
 {
+  return mouse_position (true);
+}
+
+Lisp_Object
+mouse_position (bool call_mouse_position_function)
+{
   struct frame *f;
   Lisp_Object lispy_dummy;
   Lisp_Object x, y, retval;
@@ -2463,7 +2473,7 @@ and returns whatever that function returns.  */)
     }
   XSETFRAME (lispy_dummy, f);
   retval = Fcons (lispy_dummy, Fcons (x, y));
-  if (!NILP (Vmouse_position_function))
+  if (call_mouse_position_function && !NILP (Vmouse_position_function))
     retval = call1 (Vmouse_position_function, retval);
   return retval;
 }
@@ -2558,30 +2568,34 @@ before calling this function on it, like this.
   (Lisp_Object frame, Lisp_Object x, Lisp_Object y)
 {
   CHECK_LIVE_FRAME (frame);
-  CHECK_TYPE_RANGED_INTEGER (int, x);
-  CHECK_TYPE_RANGED_INTEGER (int, y);
+  int xval = check_integer_range (x, INT_MIN, INT_MAX);
+  int yval = check_integer_range (y, INT_MIN, INT_MAX);
 
   /* I think this should be done with a hook.  */
-#ifdef HAVE_WINDOW_SYSTEM
   if (FRAME_WINDOW_P (XFRAME (frame)))
-    /* Warping the mouse will cause enternotify and focus events.  */
-    frame_set_mouse_position (XFRAME (frame), XFIXNUM (x), XFIXNUM (y));
-#else
-#if defined (MSDOS)
-  if (FRAME_MSDOS_P (XFRAME (frame)))
+    {
+#ifdef HAVE_WINDOW_SYSTEM
+      /* Warping the mouse will cause enternotify and focus events.  */
+      frame_set_mouse_position (XFRAME (frame), xval, yval);
+#endif /* HAVE_WINDOW_SYSTEM */
+    }
+#ifdef MSDOS
+  else if (FRAME_MSDOS_P (XFRAME (frame)))
     {
       Fselect_frame (frame, Qnil);
-      mouse_moveto (XFIXNUM (x), XFIXNUM (y));
+      mouse_moveto (xval, yval);
     }
-#else
+#endif /* MSDOS */
+  else
+    {
+      Fselect_frame (frame, Qnil);
 #ifdef HAVE_GPM
-    {
-      Fselect_frame (frame, Qnil);
-      term_mouse_moveto (XFIXNUM (x), XFIXNUM (y));
+      term_mouse_moveto (xval, yval);
+#else
+      (void) xval;
+      (void) yval;
+#endif /* HAVE_GPM */
     }
-#endif
-#endif
-#endif
 
   return Qnil;
 }
@@ -2599,30 +2613,35 @@ before calling this function on it, like this.
   (Lisp_Object frame, Lisp_Object x, Lisp_Object y)
 {
   CHECK_LIVE_FRAME (frame);
-  CHECK_TYPE_RANGED_INTEGER (int, x);
-  CHECK_TYPE_RANGED_INTEGER (int, y);
+  int xval = check_integer_range (x, INT_MIN, INT_MAX);
+  int yval = check_integer_range (y, INT_MIN, INT_MAX);
 
   /* I think this should be done with a hook.  */
-#ifdef HAVE_WINDOW_SYSTEM
   if (FRAME_WINDOW_P (XFRAME (frame)))
-    /* Warping the mouse will cause enternotify and focus events.  */
-    frame_set_mouse_pixel_position (XFRAME (frame), XFIXNUM (x), XFIXNUM (y));
-#else
-#if defined (MSDOS)
-  if (FRAME_MSDOS_P (XFRAME (frame)))
+    {
+      /* Warping the mouse will cause enternotify and focus events.  */
+#ifdef HAVE_WINDOW_SYSTEM
+      frame_set_mouse_pixel_position (XFRAME (frame), xval, yval);
+#endif /* HAVE_WINDOW_SYSTEM */
+    }
+#ifdef MSDOS
+  else if (FRAME_MSDOS_P (XFRAME (frame)))
     {
       Fselect_frame (frame, Qnil);
-      mouse_moveto (XFIXNUM (x), XFIXNUM (y));
+      mouse_moveto (xval, yval);
     }
-#else
+#endif /* MSDOS */
+  else
+    {
+      Fselect_frame (frame, Qnil);
 #ifdef HAVE_GPM
-    {
-      Fselect_frame (frame, Qnil);
-      term_mouse_moveto (XFIXNUM (x), XFIXNUM (y));
+      term_mouse_moveto (xval, yval);
+#else
+      (void) xval;
+      (void) yval;
+#endif /* HAVE_GPM */
+
     }
-#endif
-#endif
-#endif
 
   return Qnil;
 }
@@ -3545,6 +3564,21 @@ DEFUN ("frame-bottom-divider-width", Fbottom_divider_width, Sbottom_divider_widt
   return make_fixnum (FRAME_BOTTOM_DIVIDER_WIDTH (decode_any_frame (frame)));
 }
 
+static int
+check_frame_pixels (Lisp_Object size, Lisp_Object pixelwise, int item_size)
+{
+  CHECK_INTEGER (size);
+  if (!NILP (pixelwise))
+    item_size = 1;
+  intmax_t sz;
+  int pixel_size; /* size * item_size */
+  if (! integer_to_intmax (size, &sz)
+      || INT_MULTIPLY_WRAPV (sz, item_size, &pixel_size))
+    args_out_of_range_3 (size, make_int (INT_MIN / item_size),
+			 make_int (INT_MAX / item_size));
+  return pixel_size;
+}
+
 DEFUN ("set-frame-height", Fset_frame_height, Sset_frame_height, 2, 4,
        "(list (selected-frame) (prefix-numeric-value current-prefix-arg))",
        doc: /* Set text height of frame FRAME to HEIGHT lines.
@@ -3558,19 +3592,15 @@ window managers may refuse to honor a HEIGHT that is not an integer
 multiple of the default frame font height.
 
 When called interactively, HEIGHT is the numeric prefix and the
-currently selected frame will be set to this height.  */)
+currently selected frame will be set to this height.
+
+If FRAME is nil, it defaults to the selected frame.  */)
   (Lisp_Object frame, Lisp_Object height, Lisp_Object pretend, Lisp_Object pixelwise)
 {
   struct frame *f = decode_live_frame (frame);
-  int pixel_height;
-
-  CHECK_TYPE_RANGED_INTEGER (int, height);
-
-  pixel_height = (!NILP (pixelwise)
-		  ? XFIXNUM (height)
-		  : XFIXNUM (height) * FRAME_LINE_HEIGHT (f));
+  int pixel_height = check_frame_pixels (height, pixelwise,
+					 FRAME_LINE_HEIGHT (f));
   adjust_frame_size (f, -1, pixel_height, 1, !NILP (pretend), Qheight);
-
   return Qnil;
 }
 
@@ -3587,19 +3617,15 @@ window managers may refuse to honor a WIDTH that is not an integer
 multiple of the default frame font width.
 
 When called interactively, WIDTH is the numeric prefix and the
-currently selected frame will be set to this width.    */)
+currently selected frame will be set to this width.
+
+If FRAME is nil, it defaults to the selected frame.  */)
   (Lisp_Object frame, Lisp_Object width, Lisp_Object pretend, Lisp_Object pixelwise)
 {
   struct frame *f = decode_live_frame (frame);
-  int pixel_width;
-
-  CHECK_TYPE_RANGED_INTEGER (int, width);
-
-  pixel_width = (!NILP (pixelwise)
-		 ? XFIXNUM (width)
-		 : XFIXNUM (width) * FRAME_COLUMN_WIDTH (f));
+  int pixel_width = check_frame_pixels (width, pixelwise,
+					FRAME_COLUMN_WIDTH (f));
   adjust_frame_size (f, pixel_width, -1, 1, !NILP (pretend), Qwidth);
-
   return Qnil;
 }
 
@@ -3609,23 +3635,17 @@ Optional argument PIXELWISE non-nil means to measure in pixels.  Note:
 When `frame-resize-pixelwise' is nil, some window managers may refuse to
 honor a WIDTH that is not an integer multiple of the default frame font
 width or a HEIGHT that is not an integer multiple of the default frame
-font height.  */)
+font height.
+
+If FRAME is nil, it defaults to the selected frame.  */)
   (Lisp_Object frame, Lisp_Object width, Lisp_Object height, Lisp_Object pixelwise)
 {
   struct frame *f = decode_live_frame (frame);
-  int pixel_width, pixel_height;
-
-  CHECK_TYPE_RANGED_INTEGER (int, width);
-  CHECK_TYPE_RANGED_INTEGER (int, height);
-
-  pixel_width = (!NILP (pixelwise)
-		 ? XFIXNUM (width)
-		 : XFIXNUM (width) * FRAME_COLUMN_WIDTH (f));
-  pixel_height = (!NILP (pixelwise)
-		  ? XFIXNUM (height)
-		  : XFIXNUM (height) * FRAME_LINE_HEIGHT (f));
+  int pixel_width = check_frame_pixels (width, pixelwise,
+					FRAME_COLUMN_WIDTH (f));
+  int pixel_height = check_frame_pixels (height, pixelwise,
+					 FRAME_LINE_HEIGHT (f));
   adjust_frame_size (f, pixel_width, pixel_height, 1, 0, Qsize);
-
   return Qnil;
 }
 
@@ -3635,7 +3655,11 @@ DEFUN ("frame-position", Fframe_position,
 FRAME must be a live frame and defaults to the selected one.  The return
 value is a cons (x, y) of the coordinates of the top left corner of
 FRAME's outer frame, in pixels relative to an origin (0, 0) of FRAME's
-display.  */)
+display.
+
+Note that the values returned are not guaranteed to be accurate: The
+values depend on the underlying window system, and some systems add a
+constant offset to the values.  */)
      (Lisp_Object frame)
 {
   register struct frame *f = decode_live_frame (frame);
@@ -3655,18 +3679,17 @@ bottom edge of FRAME's display.  */)
   (Lisp_Object frame, Lisp_Object x, Lisp_Object y)
 {
   struct frame *f = decode_live_frame (frame);
-
-  CHECK_TYPE_RANGED_INTEGER (int, x);
-  CHECK_TYPE_RANGED_INTEGER (int, y);
+  int xval = check_integer_range (x, INT_MIN, INT_MAX);
+  int yval = check_integer_range (y, INT_MIN, INT_MAX);
 
   if (FRAME_WINDOW_P (f))
     {
 #ifdef HAVE_WINDOW_SYSTEM
       if (FRAME_TERMINAL (f)->set_frame_offset_hook)
-        FRAME_TERMINAL (f)->set_frame_offset_hook (f,
-                                                   XFIXNUM (x),
-                                                   XFIXNUM (y),
-                                                   1);
+	FRAME_TERMINAL (f)->set_frame_offset_hook (f, xval, yval, 1);
+#else
+      (void) xval;
+      (void) yval;
 #endif
     }
 
@@ -4641,23 +4664,22 @@ gui_set_right_fringe (struct frame *f, Lisp_Object new_value, Lisp_Object old_va
 void
 gui_set_border_width (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
-  CHECK_TYPE_RANGED_INTEGER (int, arg);
+  int border_width = check_integer_range (arg, INT_MIN, INT_MAX);
 
-  if (XFIXNUM (arg) == f->border_width)
+  if (border_width == f->border_width)
     return;
 
   if (FRAME_NATIVE_WINDOW (f) != 0)
     error ("Cannot change the border width of a frame");
 
-  f->border_width = XFIXNUM (arg);
+  f->border_width = border_width;
 }
 
 void
 gui_set_right_divider_width (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
   int old = FRAME_RIGHT_DIVIDER_WIDTH (f);
-  CHECK_TYPE_RANGED_INTEGER (int, arg);
-  int new = max (0, XFIXNUM (arg));
+  int new = check_int_nonnegative (arg);
   if (new != old)
     {
       f->right_divider_width = new;
@@ -4671,8 +4693,7 @@ void
 gui_set_bottom_divider_width (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
 {
   int old = FRAME_BOTTOM_DIVIDER_WIDTH (f);
-  CHECK_TYPE_RANGED_INTEGER (int, arg);
-  int new = max (0, XFIXNUM (arg));
+  int new = check_int_nonnegative (arg);
   if (new != old)
     {
       f->bottom_divider_width = new;
@@ -5030,8 +5051,6 @@ gui_display_get_resource (Display_Info *dpyinfo, Lisp_Object attribute,
   USE_SAFE_ALLOCA;
   char *name_key = SAFE_ALLOCA (name_keysize + class_keysize);
   char *class_key = name_key + name_keysize;
-  name_key = ptr_bounds_clip (name_key, name_keysize);
-  class_key = ptr_bounds_clip (class_key, class_keysize);
 
   /* Start with emacs.FRAMENAME for the name (the specific one)
      and with `Emacs' for the class key (the general one).  */
@@ -5102,9 +5121,6 @@ x_get_resource_string (const char *attribute, const char *class)
   ptrdiff_t class_keysize = sizeof (EMACS_CLASS) - 1 + strlen (class) + 2;
   char *name_key = SAFE_ALLOCA (name_keysize + class_keysize);
   char *class_key = name_key + name_keysize;
-  name_key = ptr_bounds_clip (name_key, name_keysize);
-  class_key = ptr_bounds_clip (class_key, class_keysize);
-
   esprintf (name_key, "%s.%s", SSDATA (Vinvocation_name), attribute);
   sprintf (class_key, "%s.%s", EMACS_CLASS, class);
 
@@ -5651,8 +5667,7 @@ gui_figure_window_size (struct frame *f, Lisp_Object parms, bool tabbar_p,
 	f->top_pos = 0;
       else
 	{
-	  CHECK_TYPE_RANGED_INTEGER (int, top);
-	  f->top_pos = XFIXNUM (top);
+	  f->top_pos = check_integer_range (top, INT_MIN, INT_MAX);
 	  if (f->top_pos < 0)
 	    window_prompting |= YNegative;
 	}
@@ -5682,8 +5697,7 @@ gui_figure_window_size (struct frame *f, Lisp_Object parms, bool tabbar_p,
 	f->left_pos = 0;
       else
 	{
-	  CHECK_TYPE_RANGED_INTEGER (int, left);
-	  f->left_pos = XFIXNUM (left);
+	  f->left_pos = check_integer_range (left, INT_MIN, INT_MAX);
 	  if (f->left_pos < 0)
 	    window_prompting |= XNegative;
 	}
@@ -5943,6 +5957,7 @@ syms_of_frame (void)
   DEFSYM (Qxg_frame_set_char_size_1, "xg-frame-set-char-size-1");
   DEFSYM (Qxg_frame_set_char_size_2, "xg-frame-set-char-size-2");
   DEFSYM (Qxg_frame_set_char_size_3, "xg-frame-set-char-size-3");
+  DEFSYM (Qxg_frame_set_char_size_4, "xg-frame-set-char-size-4");
   DEFSYM (Qx_set_window_size_1, "x-set-window-size-1");
   DEFSYM (Qx_set_window_size_2, "x-set-window-size-2");
   DEFSYM (Qx_set_window_size_3, "x-set-window-size-3");
@@ -6127,7 +6142,7 @@ when the mouse is over clickable text.  */);
   Vmouse_highlight = Qt;
 
   DEFVAR_LISP ("make-pointer-invisible", Vmake_pointer_invisible,
-               doc: /* If non-nil, make pointer invisible while typing.
+               doc: /* If non-nil, make mouse pointer invisible while typing.
 The pointer becomes visible again when the mouse is moved.  */);
   Vmake_pointer_invisible = Qt;
 
@@ -6203,7 +6218,7 @@ window of that frame is the buffer whose text will be eventually shown
 in the minibuffer window.
 
 Any other non-nil value means to resize minibuffer-only frames by
-calling `fit-frame-to-buffer'.  */);
+calling `fit-mini-frame-to-buffer'.  */);
   resize_mini_frames = Qnil;
 
   DEFVAR_LISP ("focus-follows-mouse", focus_follows_mouse,

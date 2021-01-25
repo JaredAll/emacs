@@ -1,6 +1,6 @@
 ;;; rect.el --- rectangle functions for GNU Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985, 1999-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1985, 1999-2021 Free Software Foundation, Inc.
 
 ;; Maintainer: Didier Verna <didier@didierverna.net>
 ;; Keywords: internal
@@ -521,8 +521,9 @@ Called from a program, takes three args; START, END and STRING."
                              #'rectangle--string-erase-preview nil t)
                    (add-hook 'post-command-hook
                              #'rectangle--string-preview nil t))
-               (read-string (format "String rectangle (default %s): "
-                                    (or (car string-rectangle-history) ""))
+               (read-string (format-prompt
+                             "String rectangle"
+                             (or (car string-rectangle-history) ""))
                             nil 'string-rectangle-history
                             (car string-rectangle-history)
                             'inherit-input-method))))))
@@ -549,8 +550,8 @@ This command does not delete or overwrite any existing text."
 	  (list
 	   (region-beginning)
 	   (region-end)
-	   (read-string (format "String insert rectangle (default %s): "
-				(or (car string-rectangle-history) ""))
+	   (read-string (format-prompt "String insert rectangle"
+				       (or (car string-rectangle-history) ""))
 			nil 'string-rectangle-history
 			(car string-rectangle-history)))))
   (apply-on-rectangle 'string-rectangle-line start end string nil))

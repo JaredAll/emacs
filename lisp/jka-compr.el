@@ -1,6 +1,6 @@
 ;;; jka-compr.el --- reading/writing/loading compressed files
 
-;; Copyright (C) 1993-1995, 1997, 1999-2020 Free Software Foundation,
+;; Copyright (C) 1993-1995, 1997, 1999-2021 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Jay K. Adams <jka@ece.cmu.edu>
@@ -664,11 +664,11 @@ and `inhibit-local-variables-suffixes' that were added
 by `jka-compr-installed'."
   ;; Delete from inhibit-local-variables-suffixes what jka-compr-install added.
   (mapc
-     (function (lambda (x)
-		 (and (jka-compr-info-strip-extension x)
-		      (setq inhibit-local-variables-suffixes
-			    (delete (jka-compr-info-regexp x)
-				    inhibit-local-variables-suffixes)))))
+     (lambda (x)
+       (and (jka-compr-info-strip-extension x)
+            (setq inhibit-local-variables-suffixes
+                  (delete (jka-compr-info-regexp x)
+                          inhibit-local-variables-suffixes))))
      jka-compr-compression-info-list--internal)
 
   (let* ((fnha (cons nil file-name-handler-alist))

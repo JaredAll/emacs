@@ -1,6 +1,6 @@
 ;;; ido.el --- interactively do things with buffers and files -*- lexical-binding: t -*-
 
-;; Copyright (C) 1996-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2021 Free Software Foundation, Inc.
 
 ;; Author: Kim F. Storm <storm@cua.dk>
 ;; Based on: iswitchb by Stephen Eglen <stephen@cns.ed.ac.uk>
@@ -355,7 +355,7 @@ The following values are possible:
 Setting this variable directly does not take effect;
 use either \\[customize] or the function `ido-mode'."
   :set #'(lambda (_symbol value)
-	   (ido-mode value))
+           (ido-mode (or value 0)))
   :initialize #'custom-initialize-default
   :require 'ido
   :link '(emacs-commentary-link "ido.el")
@@ -499,11 +499,14 @@ This means that \\[ido-complete] must always be followed by \\[ido-exit-minibuff
 even when there is only one unique completion."
   :type 'boolean)
 
-(defcustom ido-cannot-complete-command 'ido-completion-help
+(defcustom ido-cannot-complete-command #'ido-completion-auto-help
   "Command run when `ido-complete' can't complete any more.
 The most useful values are `ido-completion-help', which pops up a
-window with completion alternatives, or `ido-next-match' or
-`ido-prev-match', which cycle the buffer list."
+window with completion alternatives; `ido-completion-auto-help',
+which does the same but respects the value of
+`completion-auto-help'; and `ido-next-match' or `ido-prev-match',
+which cycle the buffer list."
+  :version "28.1"
   :type 'function)
 
 
@@ -839,7 +842,7 @@ variables:
   max-width - the max width of the resulting dirname; nil means no limit
   prompt    - the basic prompt (e.g. \"Find File: \")
   literal   - the string shown if doing \"literal\" find; set to nil to omit
-  vc-off    - the string shown if version control is inhibited; set to nil to omit
+  vc-off    - the string shown if version control is inhibited; use nil to omit
   prefix    - either nil or a fixed prefix for the dirname
 
 The following variables are available, but should not be changed:
@@ -1520,8 +1523,10 @@ Removes badly formatted data and ignored directories."
   (remove-function read-file-name-function #'ido-read-file-name)
   (remove-function read-buffer-function #'ido-read-buffer)
   (when ido-everywhere
-    (add-function :override read-file-name-function #'ido-read-file-name)
-    (add-function :override read-buffer-function #'ido-read-buffer)))
+    (if (not ido-mode)
+        (ido-mode 'both)
+      (add-function :override read-file-name-function #'ido-read-file-name)
+      (add-function :override read-buffer-function #'ido-read-buffer))))
 
 (defvar ido-minor-mode-map-entry nil)
 
@@ -1546,7 +1551,7 @@ This function also adds a hook to the minibuffer."
 	 ((> (prefix-numeric-value arg) 0) 'both)
 	 (t nil)))
 
-  (ido-everywhere (if ido-everywhere 1 -1))
+  (ido-everywhere (if (and ido-mode ido-everywhere) 1 -1))
 
   (when ido-mode
     (ido-common-initialization)
@@ -2213,7 +2218,10 @@ If cursor is not at the end of the user input, move to end of input."
        ((and ido-enable-virtual-buffers
 	     ido-virtual-buffers
 	     (setq filename (assoc buf ido-virtual-buffers)))
-	(ido-visit-buffer (find-file-noselect (cdr filename)) method t))
+        (if (eq method 'kill)
+            (setq recentf-list
+	          (delete (cdr filename) recentf-list))
+	  (ido-visit-buffer (find-file-noselect (cdr filename)) method t)))
 
        ((and (eq ido-create-new-buffer 'prompt)
 	     (null require-match)
@@ -2359,7 +2367,16 @@ If cursor is not at the end of the user input, move to end of input."
 	      (read-file-name-function nil))
 	  (setq this-command (or ido-fallback fallback 'find-file))
 	  (run-hook-with-args 'ido-before-fallback-functions this-command)
-	  (call-interactively this-command)))
+          (if (eq this-command 'write-file)
+              (write-file (read-file-name
+                           "Write file: "
+                           default-directory
+                           (and buffer-file-name
+                                (expand-file-name
+                                 (file-name-nondirectory buffer-file-name)
+                                 default-directory)))
+                          t)
+	    (call-interactively this-command))))
 
        ((eq ido-exit 'switch-to-buffer)
 	(ido-buffer-internal
@@ -3407,13 +3424,18 @@ instead removed from the current item list."
 
 (defun ido-make-buffer-list-1 (&optional frame visible)
   "Return list of non-ignored buffer names."
-  (delq nil
-	(mapcar
-	 (lambda (x)
-	   (let ((name (buffer-name x)))
-	     (if (not (or (ido-ignore-item-p name ido-ignore-buffers) (member name visible)))
-		 name)))
-	 (buffer-list frame))))
+  (with-temp-buffer
+    ;; Each call to ido-ignore-item-p LET-binds case-fold-search.
+    ;; That is slow if there's no buffer-local binding available,
+    ;; roughly O(number of buffers).  This hack avoids it.
+    (setq-local case-fold-search nil)
+    (delq nil
+	  (mapcar
+	   (lambda (x)
+	     (let ((name (buffer-name x)))
+	       (if (not (or (ido-ignore-item-p name ido-ignore-buffers) (member name visible)))
+		   name)))
+	   (buffer-list frame)))))
 
 (defun ido-make-buffer-list (default)
   "Return the current list of buffers.
@@ -3926,6 +3948,14 @@ If `ido-change-word-sub' cannot be found in WORD, return nil."
       (when (bobp)
 	(next-completion 1)))))
 
+(defun ido-completion-auto-help ()
+  "Call `ido-completion-help' if `completion-auto-help' is non-nil."
+  (interactive)
+  ;; Note: `completion-auto-help' could also be `lazy', but this value
+  ;; is irrelevant to ido, which is fundamentally eager, so it is
+  ;; treated the same as t.
+  (when completion-auto-help
+    (ido-completion-help)))
 
 (defun ido-completion-help ()
   "Show possible completions in the `ido-completion-buffer'."
@@ -3945,7 +3975,7 @@ If `ido-change-word-sub' cannot be found in WORD, return nil."
 		      (boundp 'ido-completion-buffer-full))
 		  (set-window-start win (point-min))
 		(with-no-warnings
-		  (set (make-local-variable 'ido-completion-buffer-full) t))
+                  (setq-local ido-completion-buffer-full t))
 		(setq full-list t
 		      display-it t))
 	    (scroll-other-window))
@@ -4057,6 +4087,7 @@ Record command in `command-history' if optional RECORD is non-nil."
       (setq buffer (buffer-name buffer)))
   (let (win newframe)
     (cond
+     ;; "Killing" of virtual buffers is handled in `ido-buffer-internal'.
      ((eq method 'kill)
       (if record
 	  (ido-record-command 'kill-buffer buffer))
@@ -4788,8 +4819,7 @@ Modified from `icomplete-completions'."
 	    (delete-region ido-eoinput (point-max))))
 
       ;; Reestablish the local variable 'cause minibuffer-setup is weird:
-      (make-local-variable 'ido-eoinput)
-      (setq ido-eoinput 1))))
+      (setq-local ido-eoinput 1))))
 
 (defun ido-summary-buffers-to-end ()
   ;; Move the summaries to the end of the buffer list.

@@ -1,6 +1,6 @@
 @c -*- coding: utf-8 -*-
 @c This is part of the Emacs manual.
-@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2020 Free Software
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2021 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Minibuffer
@@ -68,6 +68,21 @@ message is emitted while the minibuffer is active, the message hides
 the minibuffer for a few seconds, or until you type something; then
 the minibuffer comes back.  While the minibuffer is in use, Emacs does
 not echo keystrokes.
+
+@vindex minibuffer-follows-selected-frame
+  While using the minibuffer, you can switch to a different frame,
+perhaps to note text you need to enter (@pxref{Frame Commands}).  By
+default, the active minibuffer moves to this new frame.  If you set
+the user option @code{minibuffer-follows-selected-frame} to
+@code{nil}, then the minibuffer stays in the frame where you opened
+it, and you must switch back to that frame in order to complete (or
+abort) the current command.  If you set that option to a value which
+is neither @code{nil} nor @code{t}, the minibuffer moves frame only
+after a recursive minibuffer has been opened in the current command
+(@pxref{Recursive Mini,,, elisp}).  This option is mainly to retain
+(approximately) the behavior prior to Emacs 28.1.  Note that the
+effect of the command, when you finally finish using the minibuffer,
+always takes place in the frame where you first opened it.
 
 @node Minibuffer File
 @section Minibuffers for File Names
@@ -517,6 +532,13 @@ Thus, if the text in the minibuffer is @samp{foobar}, with point
 between @samp{foo} and @samp{bar}, that matches
 @samp{@var{a}foo@var{b}bar@var{c}}, where @var{a}, @var{b}, and
 @var{c} can be any string including the empty string.
+
+@item flex
+@cindex @code{flex}, completion style
+This aggressive completion style, also known as @code{flx} or
+@code{fuzzy} or @code{scatter} completion, attempts to complete using
+in-order substrings.  For example, it can consider @samp{foo} to match
+@samp{frodo} or @samp{fbarbazoo}.
 
 @item initials
 @cindex @code{initials}, completion style

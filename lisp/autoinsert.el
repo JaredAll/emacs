@@ -1,6 +1,6 @@
 ;;; autoinsert.el --- automatic mode-dependent insertion of text into new files  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1987, 1994-1995, 1998, 2000-2020 Free Software
+;; Copyright (C) 1985-1987, 1994-1995, 1998, 2000-2021 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Charlie Martin <crm@cs.duke.edu>
@@ -264,7 +264,7 @@ Foundation Web site at @url{https://www.gnu.org/licenses/fdl.html}.
 @end quotation
 
 The document was typeset with
-@uref{http://www.texinfo.org/, GNU Texinfo}.
+@uref{https://www.gnu.org/software/texinfo/, GNU Texinfo}.
 
 @end copying
 
@@ -315,8 +315,7 @@ The document was typeset with
 @printindex cp
 
 @bye
-
-@c " (file-name-nondirectory (buffer-file-name)) " ends here\n"))
+"))
   "A list specifying text to insert by default into a new file.
 Elements look like (CONDITION . ACTION) or ((CONDITION . DESCRIPTION) . ACTION).
 CONDITION may be a regexp that must match the new file's name, or it may be
@@ -396,7 +395,7 @@ Matches the visited file name against the elements of `auto-insert-alist'."
 		     ;; which might ask the user for something
 		     (switch-to-buffer (current-buffer))
 		     (if (and (consp action)
-			      (not (eq (car action) 'lambda)))
+			      (not (functionp action)))
 			 (skeleton-insert action)
 		       (funcall action)))))
 	       (if (vectorp action)

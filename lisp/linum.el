@@ -1,11 +1,11 @@
 ;;; linum.el --- display line numbers in the left margin -*- lexical-binding: t -*-
 
-;; Copyright (C) 2008-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2021 Free Software Foundation, Inc.
 
 ;; Author: Markus Triska <markus.triska@gmx.at>
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: convenience
-;; Version: 0.9x
+;; Old-Version: 0.9x
 
 ;; This file is part of GNU Emacs.
 
@@ -32,6 +32,7 @@
 ;;; Code:
 
 (defconst linum-version "0.9x")
+(make-obsolete-variable 'linum-version nil "28.1")
 
 (defvar linum-overlays nil "Overlays used in this buffer.")
 (defvar linum-available nil "Overlays available for reuse.")

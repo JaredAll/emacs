@@ -1,6 +1,6 @@
 ;;; face-remap.el --- Functions for managing `face-remapping-alist'  -*- lexical-binding: t -*-
 ;;
-;; Copyright (C) 2008-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2021 Free Software Foundation, Inc.
 ;;
 ;; Author: Miles Bader <miles@gnu.org>
 ;; Keywords: faces, face remapping, display, user commands
@@ -33,7 +33,7 @@
 ;;
 ;;   (face RELATIVE_SPECS_1 RELATIVE_SPECS_2 ... BASE_SPECS)
 ;;
-;; The "specs" values are a lists of face names or face attribute-value
+;; The "specs" values are lists of face names or face attribute-value
 ;; pairs, and are merged together, with earlier values taking precedence.
 ;;
 ;; The RELATIVE_SPECS_* values are added by `face-remap-add-relative'
@@ -183,13 +183,13 @@ to apply on top of the normal definition of FACE."
 This causes the remappings specified by `face-remap-add-relative'
 to apply on top of the face specification given by SPECS.
 
-The remaining arguments, SPECS, should form a list of faces.
-Each list element should be either a face name or a property list
+The remaining arguments, SPECS, specify the base of the remapping.
+Each one of SPECS should be either a face name or a property list
 of face attribute/value pairs, like in a `face' text property.
 
-If SPECS is empty, call `face-remap-reset-base' to use the normal
-definition of FACE as the base remapping; note that this is
-different from SPECS containing a single value nil, which means
+If SPECS is empty or a single face `eq' to FACE, call `face-remap-reset-base'
+to use the normal definition of FACE as the base remapping; note that
+this is different from SPECS containing a single value nil, which means
 not to inherit from the global definition of FACE at all."
   (while (and (consp specs) (not (null (car specs))) (null (cdr specs)))
     (setq specs (car specs)))
@@ -229,6 +229,28 @@ Each positive or negative step scales the default face height by this amount."
 (defvar text-scale-mode-amount 0)
 (make-variable-buffer-local 'text-scale-mode-amount)
 
+(defvar text-scale-remap-header-line nil
+  "If non-nil, text scaling may change font size of header lines too.")
+(make-variable-buffer-local 'text-scale-header-line)
+
+(defun face-remap--clear-remappings ()
+  (dolist (remapping
+           ;; This is a bit messy to stay backwards compatible.
+           ;; In the future, this can be simplified to just use
+           ;; `text-scale-mode-remapping'.
+           (if (consp (car-safe text-scale-mode-remapping))
+               text-scale-mode-remapping
+             (list text-scale-mode-remapping)))
+    (face-remap-remove-relative remapping))
+  (setq text-scale-mode-remapping nil))
+
+(defun face-remap--remap-face (sym)
+  (push (face-remap-add-relative sym
+                       :height
+                       (expt text-scale-mode-step
+                             text-scale-mode-amount))
+        text-scale-mode-remapping))
+
 (define-minor-mode text-scale-mode
   "Minor mode for displaying buffer text in a larger/smaller font.
 
@@ -240,20 +262,31 @@ face size by the value of the variable `text-scale-mode-step'
 The `text-scale-increase', `text-scale-decrease', and
 `text-scale-set' functions may be used to interactively modify
 the variable `text-scale-mode-amount' (they also enable or
-disable `text-scale-mode' as necessary)."
+disable `text-scale-mode' as necessary).
+
+If `text-scale-remap-header-line' is non-nil, also change
+the font size of the header line."
   :lighter (" " text-scale-mode-lighter)
-  (when text-scale-mode-remapping
-    (face-remap-remove-relative text-scale-mode-remapping))
+  (face-remap--clear-remappings)
   (setq text-scale-mode-lighter
 	(format (if (>= text-scale-mode-amount 0) "+%d" "%d")
 		text-scale-mode-amount))
-  (setq text-scale-mode-remapping
-	(and text-scale-mode
-	     (face-remap-add-relative 'default
-					  :height
-					  (expt text-scale-mode-step
-						text-scale-mode-amount))))
+  (when text-scale-mode
+    (face-remap--remap-face 'default)
+    (when text-scale-remap-header-line
+      (face-remap--remap-face 'header-line)))
   (force-window-update (current-buffer)))
+
+(defun text-scale--refresh (symbol newval operation where)
+  "Watcher for `text-scale-remap-header-line'.
+See `add-variable-watcher'."
+  (when (and (eq symbol 'text-scale-remap-header-line)
+             (eq operation 'set)
+             text-scale-mode)
+    (with-current-buffer where
+      (let ((text-scale-remap-header-line newval))
+        (text-scale-mode 1)))))
+(add-variable-watcher 'text-scale-remap-header-line #'text-scale--refresh)
 
 (defun text-scale-min-amount ()
   "Return the minimum amount of text-scaling we allow."
@@ -413,7 +446,7 @@ local, and sets it to FACE."
     (setq specs (car specs)))
   (if (null specs)
       (buffer-face-mode 0)
-    (set (make-local-variable 'buffer-face-mode-face) specs)
+    (setq-local buffer-face-mode-face specs)
     (buffer-face-mode t)))
 
 ;;;###autoload
@@ -437,7 +470,7 @@ buffer local, and set it to SPECS."
   (if (or (null specs)
 	  (and buffer-face-mode (equal buffer-face-mode-face specs)))
       (buffer-face-mode 0)
-    (set (make-local-variable 'buffer-face-mode-face) specs)
+    (setq-local buffer-face-mode-face specs)
     (buffer-face-mode t)))
 
 (defun buffer-face-mode-invoke (specs arg &optional interactive)

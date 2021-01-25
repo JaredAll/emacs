@@ -1,6 +1,6 @@
 ;;; ldap.el --- client interface to LDAP for Emacs
 
-;; Copyright (C) 1998-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2021 Free Software Foundation, Inc.
 
 ;; Author: Oscar Figueiredo <oscar@cpe.fr>
 ;; Maintainer: emacs-devel@gnu.org
@@ -29,11 +29,10 @@
 ;;    `ldapsearch' to actually perform the searches.  That program can be
 ;;    found in all LDAP developer kits such as:
 ;;      - UM-LDAP 3.3 (http://www.umich.edu/~dirsvcs/ldap/)
-;;      - OpenLDAP (http://www.openldap.org/)
+;;      - OpenLDAP (https://www.openldap.org/)
 
 ;;; Code:
 
-(require 'custom)
 (require 'password-cache)
 
 (autoload 'auth-source-search "auth-source")

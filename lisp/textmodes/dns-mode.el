@@ -1,6 +1,6 @@
 ;;; dns-mode.el --- a mode for viewing/editing Domain Name System master files
 
-;; Copyright (C) 2000-2001, 2004-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2001, 2004-2021 Free Software Foundation, Inc.
 
 ;; Author: Simon Josefsson <simon@josefsson.org>
 ;; Keywords: DNS master zone file SOA comm
@@ -178,14 +178,13 @@ variables for customizing indentation.  It has its own abbrev
 table and its own syntax table.
 
 Turning on DNS mode runs `dns-mode-hook'."
-  (set (make-local-variable 'comment-start) ";")
-  (set (make-local-variable 'comment-end) "")
-  (set (make-local-variable 'comment-start-skip) ";+ *")
-  (set (make-local-variable 'font-lock-defaults)
-       '(dns-mode-font-lock-keywords nil nil ((?_ . "w"))))
+  (setq-local comment-start ";")
+  (setq-local comment-end "")
+  (setq-local comment-start-skip ";+ *")
+  (setq-local font-lock-defaults
+              '(dns-mode-font-lock-keywords nil nil ((?_ . "w"))))
   (add-hook 'before-save-hook 'dns-mode-soa-maybe-increment-serial
-	    nil t)
-  (easy-menu-add dns-mode-menu dns-mode-map))
+            nil t))
 
 ;;;###autoload (defalias 'zone-mode 'dns-mode)
 

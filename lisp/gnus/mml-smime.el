@@ -1,6 +1,6 @@
 ;;; mml-smime.el --- S/MIME support for MML
 
-;; Copyright (C) 2000-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2021 Free Software Foundation, Inc.
 
 ;; Author: Simon Josefsson <simon@josefsson.org>
 ;; Keywords: Gnus, MIME, S/MIME, MML
@@ -329,7 +329,6 @@ Whether the passphrase is cached at all is controlled by
   (autoload 'epg-verify-string "epg")
   (autoload 'epg-sign-string "epg")
   (autoload 'epg-encrypt-string "epg")
-  (autoload 'epg-passphrase-callback-function "epg")
   (autoload 'epg-context-set-passphrase-callback "epg")
   (autoload 'epg-sub-key-fingerprint "epg")
   (autoload 'epg-configuration "epg-config")

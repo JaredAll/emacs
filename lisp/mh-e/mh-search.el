@@ -1,6 +1,6 @@
 ;;; mh-search  ---  MH-Search mode
 
-;; Copyright (C) 1993, 1995, 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1993, 1995, 2001-2021 Free Software Foundation, Inc.
 
 ;; Author: Indexed search by Satyaki Das <satyaki@theforce.stanford.edu>
 ;; Maintainer: Bill Wohler <wohler@newt.com>
@@ -618,7 +618,7 @@ The hook `mh-search-mode-hook' is called upon entry to this mode.
 
 \\{mh-search-mode-map}"
 
-  (easy-menu-add mh-pick-menu)
+  (mh-do-in-xemacs (easy-menu-add mh-pick-menu))
   (mh-set-help mh-search-mode-help-messages))
 
 

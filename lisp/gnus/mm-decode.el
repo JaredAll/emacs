@@ -1,6 +1,6 @@
 ;;; mm-decode.el --- Functions for decoding MIME things  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1998-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2021 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;;	MORIOKA Tomohiko <morioka@jaist.ac.jp>
@@ -1364,10 +1364,7 @@ PROMPT overrides the default one used to ask user for a file name."
 	  (setq file
 		(read-file-name
 		 (or prompt
-		     (format "Save MIME part to%s: "
-			     (if filename
-				 (format " (default %s)" filename)
-			       "")))
+		     (format-prompt "Save MIME part to" filename))
 		 (or directory mm-default-directory default-directory)
 		 (expand-file-name
 		  (or filename "")
@@ -1668,12 +1665,14 @@ If RECURSIVE, search recursively."
   (let ((type (car ctl))
 	(subtype (cadr (split-string (car ctl) "/")))
 	(mm-security-handle ctl) ;; (car CTL) is the type.
+	(smime-type (cdr (assq 'smime-type (mm-handle-type parts))))
 	protocol func functest)
     (cond
      ((or (equal type "application/x-pkcs7-mime")
 	  (equal type "application/pkcs7-mime"))
       (with-temp-buffer
 	(when (and (cond
+		    ((equal smime-type "signed-data") t)
 		    ((eq mm-decrypt-option 'never) nil)
 		    ((eq mm-decrypt-option 'always) t)
 		    ((eq mm-decrypt-option 'known) t)
@@ -1681,8 +1680,34 @@ If RECURSIVE, search recursively."
 			(format "Decrypt (S/MIME) part? "))))
 		   (mm-view-pkcs7 parts from))
 	  (goto-char (point-min))
-	  (insert "Content-type: text/plain\n\n")
-	  (setq parts (mm-dissect-buffer t)))))
+	  ;; The encrypted document is a MIME part, and may use either
+	  ;; CRLF (Outlook and the like) or newlines for end-of-line
+	  ;; markers.  Translate from CRLF.
+	  (while (search-forward "\r\n" nil t)
+	    (replace-match "\n"))
+	  ;; Normally there will be a Content-type header here, but
+	  ;; some mailers don't add that to the encrypted part, which
+	  ;; makes the subsequent re-dissection fail here.
+	  (save-restriction
+	    (mail-narrow-to-head)
+	    (unless (mail-fetch-field "content-type")
+	      (goto-char (point-max))
+	      (insert "Content-type: text/plain\n\n")))
+	  (setq parts
+		(if (equal smime-type "signed-data")
+		    (list (propertize
+			   "multipart/signed"
+			   'protocol "application/pkcs7-signature"
+			   'gnus-info
+			   (format
+			    "%s:%s"
+			    (get-text-property 0 'gnus-info
+					       (car mm-security-handle))
+			    (get-text-property 0 'gnus-details
+					       (car mm-security-handle))))
+			  (mm-dissect-buffer t)
+			  parts)
+		  (mm-dissect-buffer t))))))
      ((equal subtype "signed")
       (unless (and (setq protocol
 			 (mm-handle-multipart-ctl-parameter ctl 'protocol))

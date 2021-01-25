@@ -1,6 +1,6 @@
 ;;; mule-cmds.el --- commands for multilingual environment  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1997-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1997-2021 Free Software Foundation, Inc.
 ;; Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
 ;;   2005, 2006, 2007, 2008, 2009, 2010, 2011
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -55,6 +55,7 @@
 
 ;; Keep "C-x C-m ..." for mule specific commands.
 (define-key ctl-x-map "\C-m" mule-keymap)
+(define-key ctl-x-map "\\" 'activate-transient-input-method)
 
 (defvar describe-language-environment-map
   (let ((map (make-sparse-keymap "Describe Language Environment")))
@@ -139,8 +140,8 @@
       `(menu-item "Set Coding Systems" ,set-coding-system-map))
 
     (bindings--define-key map [separator-input-method] menu-bar-separator)
-    (bindings--define-key map [describe-input-method]
-      '(menu-item "Describe Input Method"  describe-input-method))
+    (bindings--define-key map [activate-transient-input-method]
+      '(menu-item "Transient Input Method" activate-transient-input-method))
     (bindings--define-key map [set-input-method]
       '(menu-item "Select Input Method..." set-input-method))
     (bindings--define-key map [toggle-input-method]
@@ -325,9 +326,7 @@ wrong, use this command again to toggle back to the right mode."
 				'undecided))
 		       buffer-file-coding-system)))
      (list (read-coding-system
-	    (if default
-		(format "Coding system for following command (default %s): " default)
-	      "Coding system for following command: ")
+            (format-prompt "Coding system for following command" default)
 	    default))))
   (prefix-command-preserve-state)
   (setq mule-cmds--prefixed-command-next-coding-system coding-system)
@@ -442,58 +441,57 @@ non-nil, it is used to sort CODINGS instead."
 	   (most-preferred (car from-priority))
 	   (lang-preferred (get-language-info current-language-environment
 					      'coding-system))
-	   (func (function
-		  (lambda (x)
-		    (let ((base (coding-system-base x)))
-		      ;; We calculate the priority number 0..255 by
-		      ;; using the 8 bits PMMLCEII as this:
-		      ;; P: 1 if most preferred.
-		      ;; MM: greater than 0 if mime-charset.
-		      ;; L: 1 if one of the current lang. env.'s codings.
-		      ;; C: 1 if one of codings listed in the category list.
-		      ;; E: 1 if not XXX-with-esc
-		      ;; II: if iso-2022 based, 0..3, else 1.
-		      (logior
-		       (ash (if (eq base most-preferred) 1 0) 7)
-		       (ash
-			(let ((mime (coding-system-get base :mime-charset)))
-			   ;; Prefer coding systems corresponding to a
-			   ;; MIME charset.
-			   (if mime
-			       ;; Lower utf-16 priority so that we
-			       ;; normally prefer utf-8 to it, and put
-			       ;; x-ctext below that.
-			       (cond ((string-match-p "utf-16"
-						      (symbol-name mime))
-				      2)
-				     ((string-match-p "^x-" (symbol-name mime))
-				      1)
-				     (t 3))
-			     0))
-			5)
-		       (ash (if (memq base lang-preferred) 1 0) 4)
-		       (ash (if (memq base from-priority) 1 0) 3)
-		       (ash (if (string-match-p "-with-esc\\'"
-						(symbol-name base))
-				0 1) 2)
-		       (if (eq (coding-system-type base) 'iso-2022)
-			   (let ((category (coding-system-category base)))
-			     ;; For ISO based coding systems, prefer
-			     ;; one that doesn't use designation nor
-			     ;; locking/single shifting.
-			       (cond
-				((or (eq category 'coding-category-iso-8-1)
-				     (eq category 'coding-category-iso-8-2))
-				 2)
-				((or (eq category 'coding-category-iso-7-tight)
-				     (eq category 'coding-category-iso-7))
-				 1)
-				(t
-				 0)))
-			   1)
-			 ))))))
-      (sort codings (function (lambda (x y)
-				(> (funcall func x) (funcall func y))))))))
+           (func (lambda (x)
+                   (let ((base (coding-system-base x)))
+                     ;; We calculate the priority number 0..255 by
+                     ;; using the 8 bits PMMLCEII as this:
+                     ;; P: 1 if most preferred.
+                     ;; MM: greater than 0 if mime-charset.
+                     ;; L: 1 if one of the current lang. env.'s codings.
+                     ;; C: 1 if one of codings listed in the category list.
+                     ;; E: 1 if not XXX-with-esc
+                     ;; II: if iso-2022 based, 0..3, else 1.
+                     (logior
+                      (ash (if (eq base most-preferred) 1 0) 7)
+                      (ash
+                       (let ((mime (coding-system-get base :mime-charset)))
+                         ;; Prefer coding systems corresponding to a
+                         ;; MIME charset.
+                         (if mime
+                             ;; Lower utf-16 priority so that we
+                             ;; normally prefer utf-8 to it, and put
+                             ;; x-ctext below that.
+                             (cond ((string-match-p "utf-16"
+                                                    (symbol-name mime))
+                                    2)
+                                   ((string-match-p "^x-" (symbol-name mime))
+                                    1)
+                                   (t 3))
+                           0))
+                       5)
+                      (ash (if (memq base lang-preferred) 1 0) 4)
+                      (ash (if (memq base from-priority) 1 0) 3)
+                      (ash (if (string-match-p "-with-esc\\'"
+                                               (symbol-name base))
+                               0 1) 2)
+                      (if (eq (coding-system-type base) 'iso-2022)
+                          (let ((category (coding-system-category base)))
+                            ;; For ISO based coding systems, prefer
+                            ;; one that doesn't use designation nor
+                            ;; locking/single shifting.
+                            (cond
+                             ((or (eq category 'coding-category-iso-8-1)
+                                  (eq category 'coding-category-iso-8-2))
+                              2)
+                             ((or (eq category 'coding-category-iso-7-tight)
+                                  (eq category 'coding-category-iso-7))
+                              1)
+                             (t
+                              0)))
+                        1)
+                      )))))
+      (sort codings (lambda (x y)
+                      (> (funcall func x) (funcall func y)))))))
 
 (defun find-coding-systems-region (from to)
   "Return a list of proper coding systems to encode a text between FROM and TO.
@@ -613,9 +611,8 @@ When called from a program, the value is the position of the unencodable
 character found, or nil if all characters are encodable."
   (interactive
    (list (let ((default (or buffer-file-coding-system 'us-ascii)))
-	   (read-coding-system
-	    (format "Coding-system (default %s): " default)
-	    default))))
+	   (read-coding-system (format-prompt "Coding-system" default)
+	                       default))))
   (let ((pos (unencodable-char-position (point) (point-max) coding-system)))
     (if pos
 	(goto-char (1+ pos))
@@ -804,9 +801,8 @@ or specify any other coding system (and risk losing\n\
 
       ;; Read a coding system.
       (setq coding-system
-	    (read-coding-system
-	     (format "Select coding system (default %s): " default)
-	     default))
+	    (read-coding-system (format-prompt "Select coding system" default)
+	                        default))
       (setq last-coding-system-specified coding-system))
 
     (kill-buffer "*Warning*")
@@ -891,7 +887,7 @@ It is highly recommended to fix it before writing to a file."
 
     ;; Change elements of the list to (coding . base-coding).
     (setq default-coding-system
-	  (mapcar (function (lambda (x) (cons x (coding-system-base x))))
+          (mapcar (lambda (x) (cons x (coding-system-base x)))
 		  default-coding-system))
 
     (if (and auto-cs (not no-other-defaults))
@@ -1085,7 +1081,7 @@ it asks the user to select a proper coding system."
     (if (fboundp select-safe-coding-system-function)
 	(funcall select-safe-coding-system-function
 		 (point-min) (point-max) coding
-		 (function (lambda (x) (coding-system-get x :mime-charset))))
+                 (lambda (x) (coding-system-get x :mime-charset)))
       coding)))
 
 ;;; Language support stuff.
@@ -1264,7 +1260,7 @@ This returns a language environment name as a string."
 	 (name (completing-read prompt
 				language-info-alist
 				(and key
-				     (function (lambda (elm) (and (listp elm) (assq key elm)))))
+                                     (lambda (elm) (and (listp elm) (assq key elm))))
 				t nil nil default)))
     (if (and (> (length name) 0)
 	     (or (not key)
@@ -1347,6 +1343,29 @@ This is the input method activated automatically by the command
   :type '(choice (const nil)
                  mule-input-method-string)
   :set-after '(current-language-environment))
+
+(defcustom default-transient-input-method nil
+  "Default transient input method.
+This is the input method activated by the command
+`activate-transient-input-method' (\\[activate-transient-input-method])."
+  :link  '(custom-manual "(emacs)Input Methods")
+  :group 'mule
+  :type '(choice (const nil)
+                 mule-input-method-string)
+  :set-after '(current-language-environment)
+  :version "28.1")
+
+(defvar current-transient-input-method nil
+  "Current input method temporarily enabled by `activate-transient-input-method'.
+If nil, that means no transient input method is active now.")
+(make-variable-buffer-local 'current-transient-input-method)
+(put 'current-transient-input-method 'permanent-local t)
+
+(defvar previous-transient-input-method nil
+  "The input method that was active before enabling the transient input method.
+If nil, that means no previous input method was active.")
+(make-variable-buffer-local 'previous-transient-input-method)
+(put 'previous-transient-input-method 'permanent-local t)
 
 (put 'input-method-function 'permanent-local t)
 
@@ -1482,7 +1501,8 @@ If INPUT-METHOD is nil, deactivate any current input method."
 (defun deactivate-input-method ()
   "Turn off the current input method."
   (when current-input-method
-    (add-to-history 'input-method-history current-input-method)
+    (unless current-transient-input-method
+      (add-to-history 'input-method-history current-input-method))
     (unwind-protect
 	(progn
 	  (setq input-method-function nil
@@ -1544,7 +1564,9 @@ which marks the variable `default-input-method' as set for Custom buffers."
   (if toggle-input-method-active
       (error "Recursive use of `toggle-input-method'"))
   (if (and current-input-method (not arg))
-      (deactivate-input-method)
+      (if current-transient-input-method
+          (deactivate-transient-input-method)
+        (deactivate-input-method))
     (let ((toggle-input-method-active t)
 	  (default (or (car input-method-history) default-input-method)))
       (if (and arg default (equal current-input-method default)
@@ -1562,6 +1584,42 @@ which marks the variable `default-input-method' as set for Custom buffers."
 	    (setq default-input-method current-input-method)
 	  (when interactive
 	    (customize-mark-as-set 'default-input-method)))))))
+
+(defun activate-transient-input-method (&optional arg interactive)
+  "Select and enable a transient input method for the current buffer.
+If `default-transient-input-method' was not yet defined, prompt for it."
+  (interactive "P\np")
+  (when (or arg (not default-transient-input-method))
+    (let* ((default (or (car input-method-history) default-input-method))
+           (input-method
+            (read-input-method-name
+             (format-prompt "Transient input method" default)
+             default t)))
+      (setq default-transient-input-method input-method)
+      (when interactive
+        (customize-mark-as-set 'default-transient-input-method))))
+  (let* ((clearfun (make-symbol "clear-transient-input-method"))
+         (exitfun
+          (lambda ()
+            (deactivate-transient-input-method)
+            (remove-hook 'input-method-after-insert-chunk-hook clearfun))))
+    (fset clearfun (lambda () (funcall exitfun)))
+    (add-hook 'input-method-after-insert-chunk-hook clearfun)
+    (setq previous-transient-input-method current-input-method)
+    (when previous-transient-input-method
+      (deactivate-input-method))
+    (activate-input-method default-transient-input-method)
+    (setq current-transient-input-method default-transient-input-method)
+    exitfun))
+
+(defun deactivate-transient-input-method ()
+  "Disable currently active transient input method for the current buffer."
+  (when current-transient-input-method
+    (deactivate-input-method)
+    (when previous-transient-input-method
+      (activate-input-method previous-transient-input-method)
+      (setq previous-transient-input-method nil))
+    (setq current-transient-input-method nil)))
 
 (autoload 'help-buffer "help-mode")
 
@@ -1803,13 +1861,11 @@ The default status is as follows:
    'raw-text)
 
   (set-default-coding-systems nil)
-  (setq default-sendmail-coding-system 'iso-latin-1)
-  ;; On Darwin systems, this should be utf-8-unix, but when this file is loaded
-  ;; that is not yet defined, so we set it in set-locale-environment instead.
-  ;; [Actually, it seems to work fine to use utf-8-unix here, and not just
-  ;; on Darwin.  The previous comment seems to be outdated?
-  ;; See patch at https://debbugs.gnu.org/15803 ]
-  (setq default-file-name-coding-system 'iso-latin-1-unix)
+  (setq default-sendmail-coding-system 'utf-8)
+  (setq default-file-name-coding-system (if (memq system-type
+                                                  '(window-nt ms-dos))
+                                            'iso-latin-1-unix
+                                          'utf-8-unix))
   ;; Preserve eol-type from existing default-process-coding-systems.
   ;; On non-unix-like systems in particular, these may have been set
   ;; carefully by the user, or by the startup code, to deal with the
@@ -1825,8 +1881,10 @@ The default status is as follows:
 	(input-coding
 	 (condition-case nil
 	     (coding-system-change-text-conversion
-	      (cdr default-process-coding-system) 'iso-latin-1)
-	   (coding-system-error 'iso-latin-1))))
+	      (cdr default-process-coding-system)
+	      (if (memq system-type '(window-nt ms-dos)) 'iso-latin-1 'utf-8))
+	   (coding-system-error
+	    (if (memq system-type '(window-nt ms-dos)) 'iso-latin-1 'utf-8)))))
     (setq default-process-coding-system
 	  (cons output-coding input-coding)))
 
@@ -2069,12 +2127,6 @@ See `set-language-info-alist' for use in programs."
 (defun set-language-environment-unibyte (language-name)
   "Do various unibyte-mode setups for language environment LANGUAGE-NAME."
   (set-display-table-and-terminal-coding-system language-name))
-
-(defun princ-list (&rest args)
-  "Print all arguments with `princ', then print \"\\n\"."
-  (declare (obsolete "use mapc and princ instead." "23.3"))
-  (mapc #'princ args)
-  (princ "\n"))
 
 (put 'describe-specified-language-support 'apropos-inhibit t)
 
@@ -2912,9 +2964,9 @@ STR should be a unibyte string."
   (mapconcat
    (if (and coding-system (eq (coding-system-type coding-system) 'iso-2022))
        ;; Try to get a pretty description for ISO 2022 escape sequences.
-       (function (lambda (x) (or (cdr (assq x iso-2022-control-alist))
-				 (format "#x%02X" x))))
-     (function (lambda (x) (format "#x%02X" x))))
+       (lambda (x) (or (cdr (assq x iso-2022-control-alist))
+                  (format "#x%02X" x)))
+     (lambda (x) (format "#x%02X" x)))
    str " "))
 
 (defun encode-coding-char (char coding-system &optional charset)
@@ -2968,11 +3020,6 @@ on encoding."
 ;; Doc said "obsolete" in 23.1, this statement only added in 24.1.
 (make-obsolete 'unify-8859-on-decoding-mode "don't use it." "23.1")
 
-(defvar nonascii-insert-offset 0)
-(make-obsolete-variable 'nonascii-insert-offset "do not use it." "23.1")
-(defvar nonascii-translation-table nil)
-(make-obsolete-variable 'nonascii-translation-table "do not use it." "23.1")
-
 (defvar ucs-names nil
   "Hash table of cached CHAR-NAME keys to CHAR-CODE values.")
 
@@ -3021,6 +3068,15 @@ on encoding."
 	        ;; higher code, so it gets pushed later!
 	        (if new-name (puthash new-name c names))
 	        (if old-name (puthash old-name c names))
+                ;; Unicode uses the spelling "lamda" in character
+                ;; names, instead of "lambda", due to "preferences
+                ;; expressed by the Greek National Body" (Bug#30513).
+                ;; Some characters have an old-name with the "lambda"
+                ;; spelling, but others don't.  Add the traditional
+                ;; spelling for more convenient completion.
+                (when (and (not old-name) new-name
+                           (string-match "\\<LAMDA\\>" new-name))
+                  (puthash (replace-match "LAMBDA" t t new-name) c names))
 	        (setq c (1+ c))))))
         ;; Special case for "BELL" which is apparently the only char which
         ;; doesn't have a new name and whose old-name is shadowed by a newer
@@ -3028,13 +3084,11 @@ on encoding."
         (puthash "BELL (BEL)" ?\a names)
         (setq ucs-names names))))
 
-(defun mule--ucs-names-annotation (name)
-  ;; FIXME: It would be much better to add this annotation before rather than
-  ;; after the char name, so the annotations are aligned.
-  ;; FIXME: The default behavior of displaying annotations in italics
-  ;; doesn't work well here.
-  (let ((char (gethash name ucs-names)))
-    (when char (format " (%c)" char))))
+(defun mule--ucs-names-affixation (names)
+  (mapcar (lambda (name)
+            (let ((char (gethash name ucs-names)))
+              (list name (concat (if char (format "%c" char) " ") "\t") "")))
+          names))
 
 (defun char-from-name (string &optional ignore-case)
   "Return a character as a number from its Unicode name STRING.
@@ -3077,13 +3131,14 @@ octal).  Treat otherwise-ambiguous strings like \"BED\" (U+1F6CF)
 as names, not numbers."
   (let* ((enable-recursive-minibuffers t)
 	 (completion-ignore-case t)
+	 (completion-tab-width 4)
 	 (input
 	  (completing-read
 	   prompt
 	   (lambda (string pred action)
 	     (if (eq action 'metadata)
 		 '(metadata
-		   (annotation-function . mule--ucs-names-annotation)
+		   (affixation-function . mule--ucs-names-affixation)
 		   (category . unicode-name))
 	       (complete-with-action action (ucs-names) string pred)))))
 	 (char

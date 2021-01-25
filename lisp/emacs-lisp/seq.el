@@ -1,10 +1,10 @@
 ;;; seq.el --- Sequence manipulation functions  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2014-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2014-2021 Free Software Foundation, Inc.
 
 ;; Author: Nicolas Petton <nicolas@petton.fr>
 ;; Keywords: sequences
-;; Version: 2.21
+;; Version: 2.22
 ;; Package: seq
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -317,7 +317,7 @@ list."
 
 ;;;###autoload
 (cl-defgeneric seq-filter (pred sequence)
-  "Return a list of all the elements for which (PRED element) is non-nil in SEQUENCE."
+  "Return a list of all elements for which (PRED element) is non-nil in SEQUENCE."
   (let ((exclude (make-symbol "exclude")))
     (delq exclude (seq-map (lambda (elt)
                              (if (funcall pred elt)
@@ -336,9 +336,11 @@ list."
   "Reduce the function FUNCTION across SEQUENCE, starting with INITIAL-VALUE.
 
 Return the result of calling FUNCTION with INITIAL-VALUE and the
-first element of SEQUENCE, then calling FUNCTION with that result and
-the second element of SEQUENCE, then with that result and the third
-element of SEQUENCE, etc.
+first element of SEQUENCE, then calling FUNCTION with that result
+and the second element of SEQUENCE, then with that result and the
+third element of SEQUENCE, etc.  FUNCTION will be called with
+INITIAL-VALUE (and then the accumulated value) as the first
+argument, and the elements from SEQUENCE as the second argument.
 
 If SEQUENCE is empty, return INITIAL-VALUE and FUNCTION is not called."
   (if (seq-empty-p sequence)
@@ -348,6 +350,7 @@ If SEQUENCE is empty, return INITIAL-VALUE and FUNCTION is not called."
         (setq acc (funcall function acc elt)))
       acc)))
 
+;;;###autoload
 (cl-defgeneric seq-every-p (pred sequence)
   "Return non-nil if (PRED element) is non-nil for all elements of SEQUENCE."
   (catch 'seq--break
@@ -408,7 +411,8 @@ Equality is defined by TESTFN if non-nil or by `equal' if nil."
       nil))
 
 (cl-defgeneric seq-set-equal-p (sequence1 sequence2 &optional testfn)
-  "Return non-nil if SEQUENCE1 and SEQUENCE2 contain the same elements, regardless of order.
+  "Return non-nil if SEQUENCE1 and SEQUENCE2 contain the same elements.
+This does not depend on the order of the elements.
 Equality is defined by TESTFN if non-nil or by `equal' if nil."
   (and (seq-every-p (lambda (item1) (seq-contains-p sequence2 item1 testfn)) sequence1)
        (seq-every-p (lambda (item2) (seq-contains-p sequence1 item2 testfn)) sequence2)))
@@ -441,7 +445,7 @@ The result is a sequence of type TYPE, or a list if TYPE is nil."
          (seq-map function sequence)))
 
 (cl-defgeneric seq-partition (sequence n)
-  "Return a list of the elements of SEQUENCE grouped into sub-sequences of length N.
+  "Return list of elements of SEQUENCE grouped into sub-sequences of length N.
 The last sequence may contain less than N elements.  If N is a
 negative integer or 0, nil is returned."
   (unless (< n 1)
@@ -471,6 +475,7 @@ Equality is defined by TESTFN if non-nil or by `equal' if nil."
               (seq-reverse sequence1)
               '()))
 
+;;;###autoload
 (cl-defgeneric seq-group-by (function sequence)
   "Apply FUNCTION to each element of SEQUENCE.
 Separate the elements of SEQUENCE into an alist using the results as
@@ -491,6 +496,7 @@ keys.  Keys are compared using `equal'."
 SEQUENCE must be a sequence of numbers or markers."
   (apply #'min (seq-into sequence 'list)))
 
+;;;###autoload
 (cl-defgeneric seq-max (sequence)
   "Return the largest element of SEQUENCE.
 SEQUENCE must be a sequence of numbers or markers."

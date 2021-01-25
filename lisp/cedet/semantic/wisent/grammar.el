@@ -1,6 +1,6 @@
 ;;; semantic/wisent/grammar.el --- Wisent's input grammar mode
 
-;; Copyright (C) 2002-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2021 Free Software Foundation, Inc.
 ;;
 ;; Author: David Ponce <david@dponce.com>
 ;; Created: 26 Aug 2002
@@ -427,7 +427,7 @@ Menu items are appended to the common grammar menu.")
   "\n;; It is derived from the grammar in the ECMAScript Language
 ;; Specification published at
 ;;
-;; http://www.ecma-international.org/publications/standards/Ecma-262.htm
+;; https://www.ecma-international.org/publications/standards/Ecma-262.htm
 ;;
 ;; and redistributed under the following license:
 ;;

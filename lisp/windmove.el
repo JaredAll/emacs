@@ -1,6 +1,6 @@
 ;;; windmove.el --- directional window-selection routines  -*- lexical-binding:t -*-
 ;;
-;; Copyright (C) 1998-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2021 Free Software Foundation, Inc.
 ;;
 ;; Author: Hovav Shacham (hovav@cs.stanford.edu)
 ;; Created: 17 October 1998
@@ -461,60 +461,38 @@ select the window with a displayed buffer, and the meaning of
 the prefix argument is reversed.
 When `switch-to-buffer-obey-display-actions' is non-nil,
 `switch-to-buffer' commands are also supported."
-  (let* ((no-select (xor (consp arg) windmove-display-no-select))
-         (old-window (or (minibuffer-selected-window) (selected-window)))
-         (new-window)
-         (minibuffer-depth (minibuffer-depth))
-         (action (lambda (buffer alist)
-                   (unless (> (minibuffer-depth) minibuffer-depth)
-                     (let* ((type 'reuse)
-                            (window (cond
-                                     ((eq dir 'new-tab)
-                                      (let ((tab-bar-new-tab-choice t))
-                                        (tab-bar-new-tab))
-                                      (setq type 'tab)
-                                      (selected-window))
-                                     ((eq dir 'new-frame)
-                                      (let* ((params (cdr (assq 'pop-up-frame-parameters alist)))
-                                             (pop-up-frame-alist (append params pop-up-frame-alist))
-                                             (frame (make-frame-on-current-monitor
-                                                     pop-up-frame-alist)))
-                                        (unless (cdr (assq 'inhibit-switch-frame alist))
-	                                  (window--maybe-raise-frame frame))
-                                        (setq type 'frame)
-                                        (frame-selected-window frame)))
-                                     ((eq dir 'same-window)
-                                      (selected-window))
-                                     (t (window-in-direction
-                                         dir nil nil
-                                         (and arg (prefix-numeric-value arg))
-                                         windmove-wrap-around)))))
-                       (unless window
-                         (setq window (split-window nil nil dir) type 'window))
-                       (setq new-window (window--display-buffer buffer window
-                                                                type alist))))))
-         (command this-command)
-         (clearfun (make-symbol "clear-display-buffer-overriding-action"))
-         (exitfun
-          (lambda ()
-            (setq display-buffer-overriding-action
-                  (delq action display-buffer-overriding-action))
-            (when (window-live-p (if no-select old-window new-window))
-              (select-window (if no-select old-window new-window)))
-            (remove-hook 'post-command-hook clearfun))))
-    (fset clearfun
-          (lambda ()
-            (unless (or
-		     ;; Remove the hook immediately
-		     ;; after exiting the minibuffer.
-		     (> (minibuffer-depth) minibuffer-depth)
-		     ;; But don't remove immediately after
-		     ;; adding the hook by the same command below.
-		     (eq this-command command))
-              (funcall exitfun))))
-    (add-hook 'post-command-hook clearfun)
-    (push action display-buffer-overriding-action)
-    (message "[display-%s]" dir)))
+  (let ((no-select (xor (consp arg) windmove-display-no-select)))
+    (display-buffer-override-next-command
+     (lambda (_buffer alist)
+       (let* ((type 'reuse)
+              (window (cond
+                       ((eq dir 'new-tab)
+                        (let ((tab-bar-new-tab-choice t))
+                          (tab-bar-new-tab))
+                        (setq type 'tab)
+                        (selected-window))
+                       ((eq dir 'new-frame)
+                        (let* ((params (cdr (assq 'pop-up-frame-parameters alist)))
+                               (pop-up-frame-alist (append params pop-up-frame-alist))
+                               (frame (make-frame-on-current-monitor
+                                       pop-up-frame-alist)))
+                          (unless (cdr (assq 'inhibit-switch-frame alist))
+	                    (window--maybe-raise-frame frame))
+                          (setq type 'frame)
+                          (frame-selected-window frame)))
+                       ((eq dir 'same-window)
+                        (selected-window))
+                       (t (window-in-direction
+                           dir nil nil
+                           (and arg (prefix-numeric-value arg))
+                           windmove-wrap-around 'nomini)))))
+         (unless window
+           (setq window (split-window nil nil dir) type 'window))
+         (cons window type)))
+     (lambda (old-window new-window)
+       (when (window-live-p (if no-select old-window new-window))
+         (select-window (if no-select old-window new-window))))
+     (format "[display-%s]" dir))))
 
 ;;;###autoload
 (defun windmove-display-left (&optional arg)
@@ -591,7 +569,7 @@ select the window at direction DIR.
 When `windmove-wrap-around' is non-nil, takes the window
 from the opposite side of the frame."
   (let ((other-window (window-in-direction dir nil nil arg
-                                           windmove-wrap-around t)))
+                                           windmove-wrap-around 'nomini)))
     (cond ((null other-window)
            (user-error "No window %s from selected window" dir))
           (t
@@ -659,7 +637,7 @@ a single modifier.  Default value of PREFIX is `C-x' and MODIFIERS is `shift'."
 When `windmove-wrap-around' is non-nil, takes the window
 from the opposite side of the frame."
   (let ((other-window (window-in-direction dir nil nil nil
-                                           windmove-wrap-around t)))
+                                           windmove-wrap-around 'nomini)))
     (cond ((or (null other-window) (window-minibuffer-p other-window))
            (user-error "No window %s from selected window" dir))
           (t

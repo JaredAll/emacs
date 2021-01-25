@@ -1,6 +1,6 @@
 ;;; nsm.el --- Network Security Manager  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2014-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2014-2021 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: encryption, security, network
@@ -164,7 +164,7 @@ STATUS SETTINGS.  HOST is the host domain, PORT is a TCP port
 number, STATUS is the peer status returned by
 `gnutls-peer-status', and SETTINGS is the persistent and session
 settings for the host HOST.  Please refer to the contents of
-`nsm-setting-file' for details.  If a problem is found, the check
+`nsm-settings-file' for details.  If a problem is found, the check
 function is required to return an error message, and nil
 otherwise.
 
@@ -239,7 +239,7 @@ otherwise."
         (mapc
          (lambda (info)
            (let ((local-ip (nth 1 info))
-                 (mask (nth 2 info)))
+                 (mask (nth 3 info)))
              (when
                  (nsm-network-same-subnet (substring local-ip 0 -1)
                                           (substring mask 0 -1)
@@ -964,6 +964,7 @@ protocol."
 
 (defun nsm-write-settings ()
   (with-temp-file nsm-settings-file
+    (insert ";;;; -*- mode: lisp-data -*-\n")
     (insert "(\n")
     (dolist (setting nsm-permanent-host-settings)
       (insert " ")

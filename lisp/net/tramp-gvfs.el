@@ -1,6 +1,6 @@
 ;;; tramp-gvfs.el --- Tramp access functions for GVFS daemon  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2009-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2009-2021 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
@@ -49,12 +49,12 @@
 
 ;; The user option `tramp-gvfs-methods' contains the list of supported
 ;; connection methods.  Per default, these are "afp", "dav", "davs",
-;; "gdrive", "media", "nextcloud" and "sftp".
+;; "gdrive", "mtp", "nextcloud" and "sftp".
 
 ;; "gdrive" and "nextcloud" connection methods require a respective
 ;; account in GNOME Online Accounts, with enabled "Files" service.
 
-;; The "media" connection method is responsible for media devices,
+;; The "mtp" connection method is responsible for media devices,
 ;; like cell phones, tablets, cameras etc.  The device must already be
 ;; connected via USB, before accessing it.
 
@@ -108,9 +108,6 @@
 (require 'url-util)
 
 ;; Pacify byte-compiler.
-(eval-when-compile
-  (require 'custom))
-
 (declare-function zeroconf-init "zeroconf")
 (declare-function zeroconf-list-service-types "zeroconf")
 (declare-function zeroconf-list-services "zeroconf")
@@ -125,13 +122,16 @@
 	 (autoload 'zeroconf-init "zeroconf")
 	 (tramp-compat-funcall 'dbus-get-unique-name :system)
 	 (tramp-compat-funcall 'dbus-get-unique-name :session)
-	 (or (tramp-process-running-p "gvfs-fuse-daemon")
+	 (or ;; Until Emacs 25, `process-attributes' could crash Emacs
+	     ;; for some processes.  Better we don't check.
+	     (<= emacs-major-version 25)
+	     (tramp-process-running-p "gvfs-fuse-daemon")
 	     (tramp-process-running-p "gvfsd-fuse"))))
   "Non-nil when GVFS is available.")
 
 ;;;###tramp-autoload
 (defcustom tramp-gvfs-methods
-  '("afp" "dav" "davs" "gdrive" "media" "nextcloud" "sftp")
+  '("afp" "dav" "davs" "gdrive" "mtp" "nextcloud" "sftp")
   "List of methods for remote files, accessed with GVFS."
   :group 'tramp
   :version "28.1"
@@ -142,7 +142,7 @@
 			 (const "gdrive")
 			 (const "http")
 			 (const "https")
-			 (const "media")
+			 (const "mtp")
 			 (const "nextcloud")
 			 (const "sftp")
 			 (const "smb"))))
@@ -159,7 +159,7 @@
 
 ;;;###tramp-autoload
 (defvar tramp-media-methods '("afc" "gphoto2" "mtp")
-  "List of GVFS methods which are covered by the \"media\" method.
+  "List of GVFS methods which are covered by the \"mtp\" method.
 They are checked during start up via
 `tramp-gvfs-interface-remotevolumemonitor'.")
 
@@ -687,39 +687,39 @@ It has been changed in GVFS 1.14.")
     ("gvfs-monitor-file" . "monitor")
     ("gvfs-mount" . "mount")
     ("gvfs-move" . "move")
-    ("gvfs-rename" . "rename")
     ("gvfs-rm" . "remove")
-    ("gvfs-set-attribute" . "set")
-    ("gvfs-trash" . "trash"))
+    ("gvfs-set-attribute" . "set"))
   "List of cons cells, mapping \"gvfs-<command>\" to \"gio <command>\".")
 
 ;; <http://www.pygtk.org/docs/pygobject/gio-constants.html>
-(defconst tramp-gvfs-file-attributes
-  '("name"
-    "type"
-    "standard::display-name"
-    "standard::symlink-target"
-    "standard::is-volatile"
-    "unix::nlink"
-    "unix::uid"
-    "owner::user"
-    "unix::gid"
-    "owner::group"
-    "time::access"
-    "time::modified"
-    "time::changed"
-    "standard::size"
-    "unix::mode"
-    "access::can-read"
-    "access::can-write"
-    "access::can-execute"
-    "unix::inode"
-    "unix::device")
-  "GVFS file attributes.")
+(eval-and-compile
+  (defconst tramp-gvfs-file-attributes
+    '("name"
+      "type"
+      "standard::display-name"
+      "standard::symlink-target"
+      "standard::is-volatile"
+      "unix::nlink"
+      "unix::uid"
+      "owner::user"
+      "unix::gid"
+      "owner::group"
+      "time::access"
+      "time::modified"
+      "time::changed"
+      "standard::size"
+      "unix::mode"
+      "access::can-read"
+      "access::can-write"
+      "access::can-execute"
+      "unix::inode"
+      "unix::device")
+    "GVFS file attributes."))
 
-(defconst tramp-gvfs-file-attributes-with-gvfs-ls-regexp
-  (concat "[[:blank:]]" (regexp-opt tramp-gvfs-file-attributes t) "=\\(.+?\\)")
-  "Regexp to parse GVFS file attributes with `gvfs-ls'.")
+(eval-and-compile
+  (defconst tramp-gvfs-file-attributes-with-gvfs-ls-regexp
+    (concat "[[:blank:]]" (regexp-opt tramp-gvfs-file-attributes t) "=\\(.+?\\)")
+    "Regexp to parse GVFS file attributes with `gvfs-ls'."))
 
 (defconst tramp-gvfs-file-attributes-with-gvfs-info-regexp
   (concat "^[[:blank:]]*"
@@ -818,6 +818,8 @@ It has been changed in GVFS 1.14.")
     (start-file-process . ignore)
     (substitute-in-file-name . tramp-handle-substitute-in-file-name)
     (temporary-file-directory . tramp-handle-temporary-file-directory)
+    (tramp-get-remote-gid . tramp-gvfs-handle-get-remote-gid)
+    (tramp-get-remote-uid . tramp-gvfs-handle-get-remote-uid)
     (tramp-set-file-uid-gid . tramp-gvfs-handle-set-file-uid-gid)
     (unhandled-file-name-directory . ignore)
     (vc-registered . ignore)
@@ -859,7 +861,7 @@ pass to the OPERATION."
 (defun tramp-gvfs-dbus-string-to-byte-array (string)
   "Like `dbus-string-to-byte-array' but add trailing \\0 if needed."
   (dbus-string-to-byte-array
-   (if (string-match "^(aya{sv})" tramp-gvfs-mountlocation-signature)
+   (if (string-match-p "^(aya{sv})" tramp-gvfs-mountlocation-signature)
        (concat string (string 0)) string)))
 
 (defun tramp-gvfs-dbus-byte-array-to-string (byte-array)
@@ -912,7 +914,9 @@ or `dbus-call-method-asynchronously'."
 		   #'dbus-call-method #'dbus-call-method-asynchronously))
 	 (args (append (list ,bus ,service ,path ,interface ,method)
 		       (if ,synchronous (list ,@args) (list 'ignore ,@args)))))
-     (tramp-dbus-function ,vec func args)))
+     ;; We use `dbus-ignore-errors', because this macro is also called
+     ;; when loading.
+     (dbus-ignore-errors (tramp-dbus-function ,vec func args))))
 
 (font-lock-add-keywords 'emacs-lisp-mode '("\\<with-tramp-dbus-call-method\\>"))
 
@@ -944,6 +948,10 @@ is no information where to trace the message.")
     (tramp-error tramp-gvfs-dbus-event-vector 'file-error "%s" (cadr err))))
 
 (add-hook 'dbus-event-error-functions #'tramp-gvfs-dbus-event-error)
+(add-hook 'tramp-gvfs-unload-hook
+	  (lambda ()
+	    (remove-hook 'dbus-event-error-functions
+			 #'tramp-gvfs-dbus-event-error)))
 
 
 ;; File name primitives.
@@ -974,15 +982,12 @@ file names."
 	(copy-directory filename newname keep-date t)
 	(when (eq op 'rename) (delete-directory filename 'recursive)))
 
-    (let* ((t1 (tramp-tramp-file-p filename))
-	   (t2 (tramp-tramp-file-p newname))
-	   (equal-remote (tramp-equal-remote filename newname))
-	   (gvfs-operation
-	    (cond
-	     ((eq op 'copy) "gvfs-copy")
-	     (equal-remote "gvfs-rename")
-	     (t "gvfs-move")))
-	   (msg-operation (if (eq op 'copy) "Copying" "Renaming")))
+    (let ((t1 (tramp-tramp-file-p filename))
+	  (t2 (tramp-tramp-file-p newname))
+	  (equal-remote (tramp-equal-remote filename newname))
+	  ;; "gvfs-rename" is not trustworthy.
+	  (gvfs-operation (if (eq op 'copy) "gvfs-copy" "gvfs-move"))
+	  (msg-operation (if (eq op 'copy) "Copying" "Renaming")))
 
       (with-parsed-tramp-file-name (if t1 filename newname) nil
 	(unless (file-exists-p filename)
@@ -1013,14 +1018,23 @@ file names."
 	  (with-tramp-progress-reporter
 	      v 0 (format "%s %s to %s" msg-operation filename newname)
 	    (unless
-		(apply
-		 #'tramp-gvfs-send-command v gvfs-operation
-		 (append
-		  (and (eq op 'copy) (or keep-date preserve-uid-gid)
-		       '("--preserve"))
-		  (list
-		   (tramp-gvfs-url-file-name filename)
-		   (tramp-gvfs-url-file-name newname))))
+		(and (apply
+		      #'tramp-gvfs-send-command v gvfs-operation
+		      (append
+		       (and (eq op 'copy) (or keep-date preserve-uid-gid)
+			    '("--preserve"))
+		       (list
+			(tramp-gvfs-url-file-name filename)
+			(tramp-gvfs-url-file-name newname))))
+		     ;; Some backends do not return a proper error
+		     ;; code in case of direct copy/move.  Apply sanity checks.
+		     (or (not equal-remote)
+			 (tramp-gvfs-send-command
+			  v "gvfs-info" (tramp-gvfs-url-file-name newname))
+			 (eq op 'copy)
+			 (not (tramp-gvfs-send-command
+			       v "gvfs-info"
+			       (tramp-gvfs-url-file-name filename)))))
 
 	      (if (or (not equal-remote)
 		      (and equal-remote
@@ -1068,24 +1082,21 @@ file names."
 
 (defun tramp-gvfs-handle-delete-directory (directory &optional recursive trash)
   "Like `delete-directory' for Tramp files."
-  (with-parsed-tramp-file-name directory nil
+  (tramp-skeleton-delete-directory directory recursive trash
     (if (and recursive (not (file-symlink-p directory)))
 	(mapc (lambda (file)
 		(if (eq t (tramp-compat-file-attribute-type
 			   (file-attributes file)))
-		    (delete-directory file recursive trash)
-		  (delete-file file trash)))
+		    (delete-directory file recursive)
+		  (delete-file file)))
 	      (directory-files
 	       directory 'full directory-files-no-dot-files-regexp))
-      (when (directory-files directory nil directory-files-no-dot-files-regexp)
+      (unless (tramp-compat-directory-empty-p directory)
 	(tramp-error
 	 v 'file-error "Couldn't delete non-empty %s" directory)))
 
-    (tramp-flush-directory-properties v localname)
-    (unless
-	(tramp-gvfs-send-command
-	 v (if (and trash delete-by-moving-to-trash) "gvfs-trash" "gvfs-rm")
-	 (tramp-gvfs-url-file-name directory))
+    (unless (tramp-gvfs-send-command
+	     v "gvfs-rm" (tramp-gvfs-url-file-name directory))
       ;; Propagate the error.
       (with-current-buffer (tramp-get-connection-buffer v)
 	(goto-char (point-min))
@@ -1096,15 +1107,15 @@ file names."
   "Like `delete-file' for Tramp files."
   (with-parsed-tramp-file-name filename nil
     (tramp-flush-file-properties v localname)
-    (unless
-	(tramp-gvfs-send-command
-	 v (if (and trash delete-by-moving-to-trash) "gvfs-trash" "gvfs-rm")
-	 (tramp-gvfs-url-file-name filename))
-      ;; Propagate the error.
-      (with-current-buffer (tramp-get-connection-buffer v)
-	(goto-char (point-min))
-	(tramp-error-with-buffer
-	 nil v 'file-error "Couldn't delete %s" filename)))))
+    (if (and delete-by-moving-to-trash trash)
+	(move-file-to-trash filename)
+      (unless (tramp-gvfs-send-command
+	       v "gvfs-rm" (tramp-gvfs-url-file-name filename))
+	;; Propagate the error.
+	(with-current-buffer (tramp-get-connection-buffer v)
+	  (goto-char (point-min))
+	  (tramp-error-with-buffer
+	   nil v 'file-error "Couldn't delete %s" filename))))))
 
 (defun tramp-gvfs-handle-expand-file-name (name &optional dir)
   "Like `expand-file-name' for Tramp files."
@@ -1170,10 +1181,11 @@ file names."
 	(with-current-buffer (tramp-get-connection-buffer v)
 	  (goto-char (point-min))
 	  (while (looking-at
-		  (concat "^\\(.+\\)[[:blank:]]"
-			  "\\([[:digit:]]+\\)[[:blank:]]"
-			  "(\\(.+?\\))"
-			  tramp-gvfs-file-attributes-with-gvfs-ls-regexp))
+		  (eval-when-compile
+		    (concat "^\\(.+\\)[[:blank:]]"
+			    "\\([[:digit:]]+\\)[[:blank:]]"
+			    "(\\(.+?\\))"
+			    tramp-gvfs-file-attributes-with-gvfs-ls-regexp)))
 	    (let ((item (list (cons "type" (match-string 3))
 			      (cons "standard::size" (match-string 2))
 			      (cons "name" (match-string 1)))))
@@ -1274,8 +1286,7 @@ If FILE-SYSTEM is non-nil, return file system attributes."
 	    (if (eq id-format 'integer)
 		(string-to-number
 		 (or (cdr (assoc "unix::uid" attributes))
-		     (eval-when-compile
-		       (format "%s" tramp-unknown-id-integer))))
+		     (eval-when-compile (format "%s" tramp-unknown-id-integer))))
 	      (or (cdr (assoc "owner::user" attributes))
 		  (cdr (assoc "unix::uid" attributes))
 		  tramp-unknown-id-string)))
@@ -1283,8 +1294,7 @@ If FILE-SYSTEM is non-nil, return file system attributes."
 	    (if (eq id-format 'integer)
 		(string-to-number
 		 (or (cdr (assoc "unix::gid" attributes))
-		     (eval-when-compile
-		       (format "%s" tramp-unknown-id-integer))))
+		     (eval-when-compile (format "%s" tramp-unknown-id-integer))))
 	      (or (cdr (assoc "owner::group" attributes))
 		  (cdr (assoc "unix::gid" attributes))
 		  tramp-unknown-id-string)))
@@ -1424,6 +1434,9 @@ If FILE-SYSTEM is non-nil, return file system attributes."
 	(unless (process-live-p p)
 	  (tramp-error
 	   p 'file-notify-error "Monitoring not supported for `%s'" file-name))
+	;; Set "gio-file-monitor" property.  We believe, that "gio
+	;; monitor" uses polling when applied for mounted files.
+	(tramp-set-connection-property p "gio-file-monitor" 'GPollFileMonitor)
 	p))))
 
 (defun tramp-gvfs-monitor-process-filter (proc string)
@@ -1438,11 +1451,11 @@ If FILE-SYSTEM is non-nil, return file system attributes."
     (tramp-message proc 6 "%S\n%s" proc string)
     (setq string (concat rest-string string)
           ;; Fix action names.
-          string (replace-regexp-in-string
+          string (tramp-compat-string-replace
 	          "attributes changed" "attribute-changed" string)
-          string (replace-regexp-in-string
+          string (tramp-compat-string-replace
 	          "changes done" "changes-done-hint" string)
-          string (replace-regexp-in-string
+          string (tramp-compat-string-replace
 	          "renamed to" "moved" string))
     ;; https://bugs.launchpad.net/bugs/1742946
     (when
@@ -1464,11 +1477,11 @@ If FILE-SYSTEM is non-nil, return file system attributes."
 	;; File names are returned as URL paths.  We must convert them.
 	(when (string-match ddu file)
 	  (setq file (replace-match dd nil nil file)))
-	(while (string-match-p "%\\([0-9A-F]\\{2\\}\\)" file)
+	(while (string-match-p "%\\([[:xdigit:]]\\{2\\}\\)" file)
 	  (setq file (url-unhex-string file)))
 	(when (string-match ddu (or file1 ""))
 	  (setq file1 (replace-match dd nil nil file1)))
-	(while (string-match-p "%\\([0-9A-F]\\{2\\}\\)" (or file1 ""))
+	(while (string-match-p "%\\([[:xdigit:]]\\{2\\}\\)" (or file1 ""))
 	  (setq file1 (url-unhex-string file1)))
 	;; Remove watch when file or directory to be watched is deleted.
 	(when (and (member action '(moved deleted))
@@ -1501,7 +1514,7 @@ If FILE-SYSTEM is non-nil, return file system attributes."
 	       ;; If the user is different from what we guess to be
 	       ;; the user, we don't know.  Let's check, whether
 	       ;; access is restricted explicitly.
-	       (and (/= (tramp-gvfs-get-remote-uid v 'integer)
+	       (and (/= (tramp-get-remote-uid v 'integer)
 			(tramp-compat-file-attribute-user-id
 			 (file-attributes filename 'integer)))
 		    (not
@@ -1584,7 +1597,27 @@ If FILE-SYSTEM is non-nil, return file system attributes."
 	       (current-time)
 	     time)))))
 
-(defun tramp-gvfs-set-file-uid-gid (filename &optional uid gid)
+(defun tramp-gvfs-handle-get-remote-uid (vec id-format)
+  "The uid of the remote connection VEC, in ID-FORMAT.
+ID-FORMAT valid values are `string' and `integer'."
+  (if (equal id-format 'string)
+      (tramp-file-name-user vec)
+    (when-let
+	((localname (tramp-get-connection-property vec "default-location" nil)))
+      (tramp-compat-file-attribute-user-id
+       (file-attributes
+	(tramp-make-tramp-file-name vec localname) id-format)))))
+
+(defun tramp-gvfs-handle-get-remote-gid (vec id-format)
+  "The gid of the remote connection VEC, in ID-FORMAT.
+ID-FORMAT valid values are `string' and `integer'."
+  (when-let
+      ((localname (tramp-get-connection-property vec "default-location" nil)))
+    (tramp-compat-file-attribute-group-id
+     (file-attributes
+      (tramp-make-tramp-file-name vec localname) id-format))))
+
+(defun tramp-gvfs-handle-set-file-uid-gid (filename &optional uid gid)
   "Like `tramp-set-file-uid-gid' for Tramp files."
   (with-parsed-tramp-file-name filename nil
     (tramp-flush-file-properties v localname)
@@ -1606,7 +1639,7 @@ If FILE-SYSTEM is non-nil, return file system attributes."
   (if (tramp-tramp-file-p filename)
       (with-parsed-tramp-file-name filename nil
 	;; Ensure that media devices are cached.
-	(when (string-equal method "media")
+	(when (string-equal method "mtp")
 	  (tramp-get-media-device v))
 	(with-tramp-connection-property v "activation-uri"
 	  (setq localname "/")
@@ -1616,7 +1649,7 @@ If FILE-SYSTEM is non-nil, return file system attributes."
 	    (setq method "davs"
 		  localname
 		  (concat (tramp-gvfs-get-remote-prefix v) localname)))
-	  (when (string-equal "media" method)
+	  (when (string-equal "mtp" method)
 	    (when-let
 		((media (tramp-get-connection-property v "media-device" nil)))
 	      (setq method (tramp-media-device-method media)
@@ -1731,8 +1764,7 @@ a downcased host name only."
 		  (list
 		   t ;; handled.
 		   nil ;; no abort of D-Bus.
-		   (with-tramp-connection-property
-		       (tramp-get-connection-process v) message
+		   (with-tramp-connection-property (tramp-get-process v) message
 		     ;; In theory, there can be several choices.
 		     ;; Until now, there is only the question whether
 		     ;; to accept an unknown host signature or certificate.
@@ -1946,8 +1978,7 @@ a downcased host name only."
      (tramp-gvfs-url-file-name (tramp-make-tramp-file-name vec))))
   (while (tramp-gvfs-connection-mounted-p vec)
     (read-event nil nil 0.1))
-  (tramp-flush-connection-properties vec)
-  (tramp-flush-connection-properties (tramp-get-connection-process vec)))
+  (tramp-cleanup-connection vec 'keep-debug 'keep-password))
 
 (defun tramp-gvfs-mount-spec-entry (key value)
   "Construct a mount-spec entry to be used in a mount_spec.
@@ -2027,9 +2058,9 @@ and \"org.gtk.Private.RemoteVolumeMonitor.VolumeRemoved\" signals."
 	   (uri (url-generic-parse-url (nth 5 volume)))
 	   (method (url-type uri))
 	   (vec (make-tramp-file-name
-		 :method "media"
+		 :method "mtp"
 		 ;; A host name cannot contain spaces.
-		 :host (replace-regexp-in-string " " "_" (nth 1 volume))))
+		 :host (tramp-compat-string-replace " " "_" (nth 1 volume))))
 	   (media (make-tramp-media-device
 		   :method method
 		   :host (tramp-gvfs-url-host (nth 5 volume))
@@ -2053,39 +2084,6 @@ and \"org.gtk.Private.RemoteVolumeMonitor.VolumeRemoved\" signals."
 
 
 ;; Connection functions.
-
-(defun tramp-gvfs-get-remote-uid (vec id-format)
-  "The uid of the remote connection VEC, in ID-FORMAT.
-ID-FORMAT valid values are `string' and `integer'."
-  (with-tramp-connection-property vec (format "uid-%s" id-format)
-    (let ((user (tramp-file-name-user vec))
-	  (localname
-	   (tramp-get-connection-property vec "default-location" nil)))
-      (cond
-       ((and (equal id-format 'string) user))
-       (localname
-	(tramp-compat-file-attribute-user-id
-	 (file-attributes
-	  (tramp-make-tramp-file-name vec localname) id-format)))
-       ((equal id-format 'integer) tramp-unknown-id-integer)
-       ((equal id-format 'string) tramp-unknown-id-string)))))
-
-(defun tramp-gvfs-get-remote-gid (vec id-format)
-  "The gid of the remote connection VEC, in ID-FORMAT.
-ID-FORMAT valid values are `string' and `integer'."
-  (with-tramp-connection-property vec (format "gid-%s" id-format)
-    (let ((localname
-	   (tramp-get-connection-property vec "default-location" nil)))
-      (cond
-       (localname
-	(tramp-compat-file-attribute-group-id
-	 (file-attributes
-	  (tramp-make-tramp-file-name vec localname) id-format)))
-       ((equal id-format 'integer) tramp-unknown-id-integer)
-       ((equal id-format 'string) tramp-unknown-id-string)))))
-
-(defvar tramp-gvfs-get-remote-uid-gid-in-progress nil
-  "Indication, that remote uid and gid determination is in progress.")
 
 (defun tramp-gvfs-get-remote-prefix (vec)
   "The prefix of the remote connection VEC.
@@ -2117,7 +2115,10 @@ connection if a previous connection has died for some reason."
 	      :buffer (tramp-get-connection-buffer vec)
 	      :server t :host 'local :service t :noquery t)))
       (process-put p 'vector vec)
-      (set-process-query-on-exit-flag p nil)))
+      (set-process-query-on-exit-flag p nil)
+
+      ;; Set connection-local variables.
+      (tramp-set-connection-local-variables vec)))
 
   (unless (tramp-gvfs-connection-mounted-p vec)
     (let ((method (tramp-file-name-method vec))
@@ -2221,21 +2222,9 @@ connection if a previous connection has died for some reason."
 	  (and (functionp tramp-password-save-function)
 	       (funcall tramp-password-save-function)))
 
-	;; Set connection-local variables.
-	(tramp-set-connection-local-variables vec)
-
 	;; Mark it as connected.
 	(tramp-set-connection-property
-	 (tramp-get-connection-process vec) "connected" t))))
-
-  ;; In `tramp-check-cached-permissions', the connection properties
-  ;; "{uid,gid}-{integer,string}" are used.  We set them to proper values.
-  (unless tramp-gvfs-get-remote-uid-gid-in-progress
-    (let ((tramp-gvfs-get-remote-uid-gid-in-progress t))
-      (tramp-gvfs-get-remote-uid vec 'integer)
-      (tramp-gvfs-get-remote-gid vec 'integer)
-      (tramp-gvfs-get-remote-uid vec 'string)
-      (tramp-gvfs-get-remote-gid vec 'string))))
+	 (tramp-get-connection-process vec) "connected" t)))))
 
 (defun tramp-gvfs-gio-tool-p (vec)
   "Check, whether the gio tool is available."
@@ -2374,9 +2363,9 @@ VEC is used only for traces."
 			      tramp-gvfs-interface-remotevolumemonitor "List")))
 	(let* ((uri (url-generic-parse-url (nth 5 volume)))
 	       (vec (make-tramp-file-name
-		     :method "media"
+		     :method "mtp"
 		     ;; A host name cannot contain spaces.
-		     :host (replace-regexp-in-string " " "_" (nth 1 volume))))
+		     :host (tramp-compat-string-replace " " "_" (nth 1 volume))))
 	       (media (make-tramp-media-device
 		       :method method
 		       :host (tramp-gvfs-url-host (nth 5 volume))
@@ -2387,12 +2376,12 @@ VEC is used only for traces."
 	  (tramp-set-connection-property vec "media-device" media)
 	  (tramp-set-connection-property media "vector" vec))))
 
-    ;; Adapt default host name, supporting /media:: when possible.
+    ;; Adapt default host name, supporting /mtp:: when possible.
     (setq tramp-default-host-alist
 	  (append
-	   `(("media" nil ,(if (= (length devices) 1) (car devices) "")))
+	   `(("mtp" nil ,(if (= (length devices) 1) (car devices) "")))
 	   (delete
-	    (assoc "media" tramp-default-host-alist)
+	    (assoc "mtp" tramp-default-host-alist)
 	    tramp-default-host-alist)))))
 
 (defun tramp-parse-media-names (service)
@@ -2456,7 +2445,10 @@ This uses \"avahi-browse\" in case D-Bus is not enabled in Avahi."
 
 (when tramp-gvfs-enabled
   ;; Suppress D-Bus error messages and Tramp traces.
-  (let ((tramp-verbose 0)
+  (let (;; Sometimes, it fails with "Variable binding depth exceeds
+	;; max-specpdl-size".  Shall be fixed in Emacs 27.
+	(max-specpdl-size (* 2 max-specpdl-size))
+	(tramp-verbose 0)
 	tramp-gvfs-dbus-event-vector fun)
     ;; Add completion functions for services announced by DNS-SD.
     ;; See <http://www.dns-sd.org/ServiceTypes.html> for valid service types.
@@ -2506,7 +2498,7 @@ This uses \"avahi-browse\" in case D-Bus is not enabled in Avahi."
     ;; Add completion functions for media devices.
     (tramp-get-media-devices nil)
     (tramp-set-completion-function
-     "media"
+     "mtp"
      (mapcar
       (lambda (method) `(tramp-parse-media-names ,(format "_%s._tcp" method)))
       tramp-media-methods))))

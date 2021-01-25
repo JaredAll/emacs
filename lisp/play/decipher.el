@@ -1,6 +1,6 @@
 ;;; decipher.el --- cryptanalyze monoalphabetic substitution ciphers
 ;;
-;; Copyright (C) 1995-1996, 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1995-1996, 2001-2021 Free Software Foundation, Inc.
 ;;
 ;; Author: Christopher J. Madsen <chris_madsen@geocities.com>
 ;; Keywords: games
@@ -292,8 +292,8 @@ The most useful commands are:
   (set-syntax-table decipher-mode-syntax-table)
   (unless (= (point-min) (point-max))
     (decipher-read-alphabet))
-  (set (make-local-variable 'font-lock-defaults)
-       '(decipher-font-lock-keywords t))
+  (setq-local font-lock-defaults
+              '(decipher-font-lock-keywords t))
   ;; Make the buffer writable when we exit Decipher mode:
   (add-hook 'change-major-mode-hook
             (lambda () (setq buffer-read-only nil

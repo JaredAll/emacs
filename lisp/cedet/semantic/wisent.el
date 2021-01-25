@@ -1,6 +1,6 @@
 ;;; semantic/wisent.el --- Wisent - Semantic gateway
 
-;; Copyright (C) 2001-2007, 2009-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2007, 2009-2021 Free Software Foundation, Inc.
 
 ;; Author: David Ponce <david@dponce.com>
 ;; Created: 30 Aug 2001
@@ -42,11 +42,6 @@
 (defvar wisent-lex-lookahead nil
   "Extra lookahead token.
 When non-nil it is directly returned by `wisent-lex-function'.")
-
-;; Maintain this alias for compatibility until all WY grammars have
-;; been translated again to Elisp code.
-(semantic-alias-obsolete 'wisent-lex-make-token-table
-                         'semantic-lex-make-type-table "23.2")
 
 (defmacro wisent-lex-eoi ()
   "Return an End-Of-Input lexical token.

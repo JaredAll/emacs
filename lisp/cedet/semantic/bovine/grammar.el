@@ -1,6 +1,6 @@
 ;;; semantic/bovine/grammar.el --- Bovine's input grammar mode
 ;;
-;; Copyright (C) 2002-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2021 Free Software Foundation, Inc.
 ;;
 ;; Author: David Ponce <david@dponce.com>
 ;; Created: 26 Aug 2002
@@ -143,8 +143,7 @@ expanded from elsewhere."
               form  (cdr form))
 	;; Hack for dealing with new reading of unquotes outside of
 	;; backquote (introduced in 2010-12-06T16:37:26Z!monnier@iro.umontreal.ca).
-	(when (and (>= emacs-major-version 24)
-		   (listp first)
+        (when (and (listp first)
 		   (or (equal (car first) '\,)
 		       (equal (car first) '\,@)))
 	  (if (listp (cadr first))

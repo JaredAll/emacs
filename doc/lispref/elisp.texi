@@ -99,7 +99,7 @@ This is the @cite{GNU Emacs Lisp Reference Manual}
 @end ifclear
 corresponding to Emacs version @value{EMACSVER}.
 
-Copyright @copyright{} 1990--1996, 1998--2020 Free Software Foundation,
+Copyright @copyright{} 1990--1996, 1998--2021 Free Software Foundation,
 Inc.
 
 @quotation
@@ -297,6 +297,7 @@ Lisp Data Types
 * Circular Objects::        Read syntax for circular structure.
 * Type Predicates::         Tests related to types.
 * Equality Predicates::     Tests of equality between any two objects.
+* Mutability::              Some objects should not be modified.
 
 Programming Types
 
@@ -738,6 +739,7 @@ Minibuffers
 * Minibuffer Windows::      Operating on the special minibuffer windows.
 * Minibuffer Contents::     How such commands access the minibuffer text.
 * Recursive Mini::          Whether recursive entry to minibuffer is allowed.
+* Inhibiting Interaction::  Running Emacs when no interaction is possible.
 * Minibuffer Misc::         Various customization hooks and variables.
 
 Completion

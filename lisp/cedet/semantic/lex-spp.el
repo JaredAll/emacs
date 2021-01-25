@@ -1,6 +1,6 @@
 ;;; semantic/lex-spp.el --- Semantic Lexical Pre-processor
 
-;; Copyright (C) 2006-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2021 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -70,7 +70,7 @@
 (require 'semantic)
 (require 'semantic/lex)
 
-(declare-function semantic-c-end-of-macro "semantic/bovine/c")
+(declare-function c-end-of-macro "cc-engine")
 
 ;;; Code:
 (defvar semantic-lex-spp-macro-symbol-obarray nil
@@ -946,7 +946,7 @@ by another macro."
     (save-excursion
       (let ((start (match-beginning 0))
 	    (end (match-end 0))
-	    (peom (save-excursion (semantic-c-end-of-macro) (point))))
+	    (peom (save-excursion (c-end-of-macro) (point))))
 	(condition-case nil
 	   (progn
 	     ;; This will throw an error if no closing paren can be found.

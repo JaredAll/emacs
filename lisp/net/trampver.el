@@ -1,12 +1,16 @@
 ;;; trampver.el --- Transparent Remote Access, Multiple Protocol  -*- lexical-binding:t -*-
 ;;; lisp/trampver.el.  Generated from trampver.el.in by configure.
 
-;; Copyright (C) 2003-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2003-2021 Free Software Foundation, Inc.
 
 ;; Author: Kai Großjohann <kai.grossjohann@gmx.net>
 ;; Maintainer: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
 ;; Package: tramp
+;; Version: 2.5.1-pre
+;; Package-Requires: ((emacs "25.1"))
+;; Package-Type: multi
+;; URL: https://www.gnu.org/software/tramp/
 
 ;; This file is part of GNU Emacs.
 
@@ -30,13 +34,13 @@
 
 ;;; Code:
 
-;; In the Tramp GIT, the version number is auto-frobbed from tramp.el,
-;; and the bug report address is auto-frobbed from configure.ac.
-;; Emacs version check is defined in macro AC_EMACS_INFO of
-;; aclocal.m4; should be changed only there.
+;; In the Tramp GIT repository, the version number, the bug report
+;; address and the required Emacs version are auto-frobbed from
+;; configure.ac, so you should edit that file and run "autoconf &&
+;; ./configure" to change them.
 
 ;;;###tramp-autoload
-(defconst tramp-version "2.5.0-pre"
+(defconst tramp-version "2.5.1-pre"
   "This version of Tramp.")
 
 ;;;###tramp-autoload
@@ -48,6 +52,7 @@
     ;; Suppress message from `emacs-repository-get-branch'.  We must
     ;; also handle out-of-tree builds.
     (let ((inhibit-message t)
+	  (debug-on-error nil)
 	  (dir (or (locate-dominating-file (locate-library "tramp") ".git")
 		   source-directory)))
       ;; `emacs-repository-get-branch' has been introduced with Emacs 27.1.
@@ -61,6 +66,7 @@
     ;; Suppress message from `emacs-repository-get-version'.  We must
     ;; also handle out-of-tree builds.
     (let ((inhibit-message t)
+	  (debug-on-error nil)
 	  (dir (or (locate-dominating-file (locate-library "tramp") ".git")
 		   source-directory)))
       (and (stringp dir) (file-directory-p dir)
@@ -70,7 +76,7 @@
 ;; Check for Emacs version.
 (let ((x   (if (not (string-lessp emacs-version "25.1"))
       "ok"
-    (format "Tramp 2.5.0-pre is not fit for %s"
+    (format "Tramp 2.5.1-pre is not fit for %s"
             (replace-regexp-in-string "\n" "" (emacs-version))))))
   (unless (string-equal "ok" x) (error "%s" x)))
 
@@ -90,7 +96,7 @@
 	 ("2.2.13.25.2" . "25.3")
          ("2.3.3" . "26.1") ("2.3.3.26.1" . "26.1") ("2.3.5.26.2" . "26.2")
          ("2.3.5.26.3" . "26.3")
-         ("2.4.3.27.1" . "27.1")))
+         ("2.4.3.27.1" . "27.1") ("2.4.5.27.2" . "27.2")))
 
 (add-hook 'tramp-unload-hook
 	  (lambda ()

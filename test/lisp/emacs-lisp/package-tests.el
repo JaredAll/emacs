@@ -1,6 +1,6 @@
-;;; package-test.el --- Tests for the Emacs package system
+;;; package-tests.el --- Tests for the Emacs package system  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2013-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2021 Free Software Foundation, Inc.
 
 ;; Author: Daniel Hackney <dan@haxney.org>
 ;; Version: 1.0
@@ -39,6 +39,7 @@
 
 (require 'package)
 (require 'ert)
+(require 'ert-x)
 (require 'cl-lib)
 
 (setq package-menu-async nil)
@@ -102,12 +103,8 @@
                                (multi-file (0 1))))
   "`package-desc' used for testing dependencies.")
 
-(defvar package-test-data-dir (expand-file-name "package-resources" package-test-file-dir)
+(defvar package-test-data-dir (ert-resource-directory)
   "Base directory of package test files.")
-
-(defvar package-test-fake-contents-file
-  (expand-file-name "archive-contents" package-test-data-dir)
-  "Path to a static copy of \"archive-contents\".")
 
 (cl-defmacro with-package-test ((&optional &key file
                                            basedir
@@ -143,8 +140,8 @@
            ,(if basedir `(cd ,basedir))
            (unless (file-directory-p package-user-dir)
              (mkdir package-user-dir))
-           (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest r) t))
-                     ((symbol-function 'y-or-n-p)    (lambda (&rest r) t)))
+           (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) t))
+                     ((symbol-function 'y-or-n-p)    (lambda (&rest _) t)))
              ,@(when install
                  `((package-initialize)
                    (package-refresh-contents)
@@ -154,6 +151,15 @@
                     `(insert-file-contents ,file))
                ,@body)))
 
+       (when ,upload-base
+         (dolist (f '("archive-contents"
+                      "simple-single-1.3.el"
+                      "simple-single-1.4.el"
+                      "simple-single-readme.txt"))
+           (ignore-errors
+             (delete-file
+              (expand-file-name f package-test-archive-upload-base))))
+         (delete-directory package-test-archive-upload-base))
        (when (file-directory-p package-test-user-dir)
          (delete-directory package-test-user-dir t))
 
@@ -175,9 +181,8 @@
 
 (defun package-test-suffix-matches (base suffix-list)
   "Return file names matching BASE concatenated with each item in SUFFIX-LIST"
-  (cl-mapcan
-   '(lambda (item) (file-expand-wildcards (concat base item)))
-   suffix-list))
+  (mapcan (lambda (item) (file-expand-wildcards (concat base item)))
+          suffix-list))
 
 (defvar tar-parse-info)
 (declare-function tar-header-name "tar-mode" (cl-x) t) ; defstruct
@@ -216,20 +221,20 @@ Must called from within a `tar-mode' buffer."
 
 (ert-deftest package-test-desc-from-buffer ()
   "Parse an elisp buffer to get a `package-desc' object."
-  (with-package-test (:basedir "package-resources" :file "simple-single-1.3.el")
+  (with-package-test (:basedir (ert-resource-directory) :file "simple-single-1.3.el")
     (should (package-test--compatible-p
              (package-buffer-info) simple-single-desc 'kind)))
-  (with-package-test (:basedir "package-resources" :file "simple-depend-1.0.el")
+  (with-package-test (:basedir (ert-resource-directory) :file "simple-depend-1.0.el")
     (should (package-test--compatible-p
              (package-buffer-info) simple-depend-desc 'kind)))
-  (with-package-test (:basedir "package-resources"
+  (with-package-test (:basedir (ert-resource-directory)
                                :file "multi-file-0.2.3.tar")
     (tar-mode)
     (should (equal (package-tar-file-info) multi-file-desc))))
 
 (ert-deftest package-test-install-single ()
   "Install a single file without using an archive."
-  (with-package-test (:basedir "package-resources" :file "simple-single-1.3.el")
+  (with-package-test (:basedir (ert-resource-directory) :file "simple-single-1.3.el")
     (should (package-install-from-buffer))
     (package-initialize)
     (should (package-installed-p 'simple-single))
@@ -267,9 +272,12 @@ Must called from within a `tar-mode' buffer."
     (should (package-installed-p 'simple-single))
     (should (package-installed-p 'simple-depend))))
 
+(declare-function macro-problem-func "macro-problem" ())
+(declare-function macro-problem-10-and-90 "macro-problem" ())
+
 (ert-deftest package-test-macro-compilation ()
   "Install a package which includes a dependency."
-  (with-package-test (:basedir "package-resources")
+  (with-package-test (:basedir (ert-resource-directory))
     (package-install-file (expand-file-name "macro-problem-package-1.0/"))
     (require 'macro-problem)
     ;; `macro-problem-func' uses a macro from `macro-aux'.
@@ -308,8 +316,7 @@ Must called from within a `tar-mode' buffer."
 (ert-deftest package-test-install-prioritized ()
   "Install a lower version from a higher-prioritized archive."
   (with-package-test ()
-    (let* ((newer-version (expand-file-name "package-resources/newer-versions"
-                                            package-test-file-dir))
+    (let* ((newer-version (ert-resource-file "newer-versions"))
            (package-archives `(("older" . ,package-test-data-dir)
                                ("newer" . ,newer-version)))
            (package-archive-priorities '(("older" . 100))))
@@ -324,7 +331,7 @@ Must called from within a `tar-mode' buffer."
 
 (ert-deftest package-test-install-multifile ()
   "Check properties of the installed multi-file package."
-  (with-package-test (:basedir "package-resources" :install '(multi-file))
+  (with-package-test (:basedir (ert-resource-directory) :install '(multi-file))
     (let ((autoload-file
            (expand-file-name "multi-file-autoloads.el"
                              (expand-file-name
@@ -398,9 +405,9 @@ Must called from within a `tar-mode' buffer."
 (ert-deftest package-test-list-filter-by-name ()
   "Ensure package list is filtered correctly by package name."
   (with-package-menu-test ()
-    (package-menu-filter-by-name "tetris")
+    (package-menu-filter-by-name "ansi-color")
     (goto-char (point-min))
-    (should (re-search-forward "^\\s-+tetris" nil t))
+    (should (re-search-forward "^\\s-+ansi-color" nil t))
     (should (= (count-lines (point-min) (point-max)) 1))))
 
 (ert-deftest package-test-list-filter-by-status ()
@@ -412,6 +419,21 @@ Must called from within a `tar-mode' buffer."
     (should (= (count-lines (point-min) (point-max)) 4))
     ;; No installed packages in default environment.
     (should-error (package-menu-filter-by-status "installed"))))
+
+(ert-deftest package-test-list-filter-marked ()
+  "Ensure package list is filtered correctly by non-empty mark."
+  (with-package-test ()
+    (package-list-packages)
+    (revert-buffer)
+    (search-forward-regexp "^ +simple-single")
+    (package-menu-mark-install)
+    (package-menu-filter-marked)
+    (goto-char (point-min))
+    (should (re-search-forward "^I +simple-single" nil t))
+    (should (= (count-lines (point-min) (point-max)) 1))
+    (package-menu-mark-unmark)
+    ;; No marked packages in default environment.
+    (should-error (package-menu-filter-marked))))
 
 (ert-deftest package-test-list-filter-by-version ()
   (with-package-menu-test
@@ -441,7 +463,7 @@ Must called from within a `tar-mode' buffer."
   "Ensure package list filter is cleared correctly."
   (with-package-menu-test
     (let ((num-packages (count-lines (point-min) (point-max))))
-      (package-menu-filter-by-name "tetris")
+      (package-menu-filter-by-name "ansi-color")
       (should (= (count-lines (point-min) (point-max)) 1))
       (package-menu-clear-filter)
       (should (= (count-lines (point-min) (point-max)) num-packages)))))
@@ -449,14 +471,13 @@ Must called from within a `tar-mode' buffer."
 (ert-deftest package-test-update-archives ()
   "Test updating package archives."
   (with-package-test ()
-    (let ((buf (package-list-packages)))
+    (let ((_buf (package-list-packages)))
       (revert-buffer)
       (search-forward-regexp "^ +simple-single")
       (package-menu-mark-install)
       (package-menu-execute)
       (should (package-installed-p 'simple-single))
-      (let ((package-test-data-dir
-             (expand-file-name "package-resources/newer-versions" package-test-file-dir)))
+      (let ((package-test-data-dir (ert-resource-file "newer-versions")))
         (setq package-archives `(("gnu" . ,package-test-data-dir)))
         (revert-buffer)
 
@@ -475,6 +496,7 @@ Must called from within a `tar-mode' buffer."
 
 (ert-deftest package-test-update-archives-async ()
   "Test updating package archives asynchronously."
+  :tags '(:expensive-test)
   (skip-unless (executable-find "python2"))
   (let* ((package-menu-async t)
          (default-directory package-test-data-dir)
@@ -494,7 +516,7 @@ Must called from within a `tar-mode' buffer."
                  (when (re-search-forward "Server started, \\(.*\\)\n" nil t)
                    (setq addr (match-string 1))))
                addr)))
-          (with-package-test (:basedir package-test-data-dir :location addr)
+          (with-package-test (:basedir (ert-resource-directory) :location addr)
             (list-packages)
             (should package--downloads-in-progress)
             (should mode-line-process)
@@ -514,8 +536,7 @@ Must called from within a `tar-mode' buffer."
 (ert-deftest package-test-update-archives/ignore-nil-entry ()
   "Ignore any packages that are nil.  Test for Bug#28502."
   (with-package-test ()
-    (let* ((with-nil-entry (expand-file-name "package-resources/with-nil-entry"
-                                             package-test-file-dir))
+    (let* ((with-nil-entry (ert-resource-file "with-nil-entry"))
            (package-archives `(("with-nil-entry" . ,with-nil-entry))))
       (package-initialize)
       (package-refresh-contents)
@@ -593,6 +614,7 @@ Must called from within a `tar-mode' buffer."
      (should (search-forward "This is a bare-bones readme file for the multi-file"
                              nil t)))))
 
+(defvar epg-config--program-alist) ; Silence byte-compiler.
 (ert-deftest package-test-signed ()
   "Test verifying package signature."
   (skip-unless (let ((homedir (make-temp-file "package-test" t)))
@@ -600,6 +622,8 @@ Must called from within a `tar-mode' buffer."
 		     (let ((process-environment
 			    (cons (concat "HOME=" homedir)
 				  process-environment)))
+                       (require 'epg-config)
+                       (defvar epg-config--program-alist)
 		       (epg-find-configuration
                         'OpenPGP nil
                         ;; By default we require gpg2 2.1+ due to some
@@ -613,8 +637,7 @@ Must called from within a `tar-mode' buffer."
                           prog-alist)))
 		   (delete-directory homedir t))))
   (let* ((keyring (expand-file-name "key.pub" package-test-data-dir))
-	 (package-test-data-dir
-	   (expand-file-name "package-resources/signed" package-test-file-dir)))
+         (package-test-data-dir (ert-resource-file "signed")))
     (with-package-test ()
       (package-initialize)
       (package-import-keyring keyring)
@@ -631,7 +654,7 @@ Must called from within a `tar-mode' buffer."
         (should (progn (package-install 'signed-good) 'noerror))
         (should (progn (package-install 'signed-bad) 'noerror)))
       ;; Check if the installed package status is updated.
-      (let ((buf (package-list-packages)))
+      (let ((_buf (package-list-packages)))
 	(revert-buffer)
 	(should (re-search-forward
 		 "^\\s-+signed-good\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-"
@@ -675,7 +698,7 @@ Must called from within a `tar-mode' buffer."
 
 (ert-deftest package-x-test-upload-buffer ()
   "Test creating an \"archive-contents\" file"
-  (with-package-test (:basedir "package-resources"
+  (with-package-test (:basedir (ert-resource-directory)
                                :file "simple-single-1.3.el"
                                :upload-base t)
     (package-upload-buffer)
@@ -708,7 +731,7 @@ Must called from within a `tar-mode' buffer."
 
 (ert-deftest package-x-test-upload-new-version ()
   "Test uploading a new version of a package"
-  (with-package-test (:basedir "package-resources"
+  (with-package-test (:basedir (ert-resource-directory)
                                :file "simple-single-1.3.el"
                                :upload-base t)
     (package-upload-buffer)
@@ -785,4 +808,4 @@ Must called from within a `tar-mode' buffer."
 
 (provide 'package-test)
 
-;;; package-test.el ends here
+;;; package-tests.el ends here

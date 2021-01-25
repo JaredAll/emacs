@@ -1,6 +1,6 @@
 ;;; ede/emacs.el --- Special project for Emacs
 
-;; Copyright (C) 2008-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2021 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -234,20 +234,19 @@ All files need the macros from lisp.h!"
       (let* ((D (car dirs))
 	     (ed (expand-file-name D base))
 	     (ef (expand-file-name name ed)))
-	(if (file-exists-p ef)
-	    (setq ans ef)
-	  ;; Not in this dir?  How about subdirs?
-	  (let ((dirfile (directory-files ed t))
-		(moredirs nil)
-		)
-	    ;; Get all the subdirs.
-	    (dolist (DF dirfile)
-	      (when (and (file-directory-p DF)
-			 (not (string-match "\\.$" DF)))
-		(push DF moredirs)))
-	    ;; Try again.
-	    (setq ans (ede-emacs-find-in-directories name ed moredirs))
-	    ))
+	(when (file-exists-p ed)
+          (if (file-exists-p ef)
+	      (setq ans ef)
+	    ;; Not in this dir?  How about subdirs?
+	    (let ((dirfile (directory-files ed t))
+		  (moredirs nil))
+	      ;; Get all the subdirs.
+	      (dolist (DF dirfile)
+	        (when (and (file-directory-p DF)
+			   (not (string-match "\\.$" DF)))
+		  (push DF moredirs)))
+	      ;; Try again.
+	      (setq ans (ede-emacs-find-in-directories name ed moredirs)))))
 	(setq dirs (cdr dirs))))
     ans))
 

@@ -1,6 +1,6 @@
 ;;; url-util.el --- Miscellaneous helper routines for URL library -*- lexical-binding: t -*-
 
-;; Copyright (C) 1996-1999, 2001, 2004-2020 Free Software Foundation,
+;; Copyright (C) 1996-1999, 2001, 2004-2021 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Bill Perry <wmperry@gnu.org>
@@ -569,38 +569,13 @@ Has a preference for looking backward when not directly on a symbol."
 	  (setq url nil))
       url)))
 
-(defun url-generate-unique-filename (&optional fmt)
-  "Generate a unique filename in `url-temporary-directory'."
-  (declare (obsolete make-temp-file "23.1"))
-  ;; This variable is obsolete, but so is this function.
-  (let ((tempdir (with-no-warnings url-temporary-directory)))
-    (if (not fmt)
-	(let ((base (format "url-tmp.%d" (user-real-uid)))
-	      (fname "")
-	      (x 0))
-	  (setq fname (format "%s%d" base x))
-	  (while (file-exists-p
-		  (expand-file-name fname tempdir))
-	    (setq x (1+ x)
-		  fname (concat base (int-to-string x))))
-	  (expand-file-name fname tempdir))
-      (let ((base (concat "url" (int-to-string (user-real-uid))))
-	    (fname "")
-	    (x 0))
-	(setq fname (format fmt (concat base (int-to-string x))))
-	(while (file-exists-p
-		(expand-file-name fname tempdir))
-	  (setq x (1+ x)
-		fname (format fmt (concat base (int-to-string x)))))
-	(expand-file-name fname tempdir)))))
-
 (defun url-extract-mime-headers ()
   "Set `url-current-mime-headers' in current buffer."
   (save-excursion
     (goto-char (point-min))
     (unless url-current-mime-headers
-      (set (make-local-variable 'url-current-mime-headers)
-	   (mail-header-extract)))))
+      (setq-local url-current-mime-headers
+                  (mail-header-extract)))))
 
 (defun url-make-private-file (file)
   "Make FILE only readable and writable by the current user.

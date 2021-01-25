@@ -1,11 +1,11 @@
 ;;; svg.el --- SVG image creation functions -*- lexical-binding: t -*-
 
-;; Copyright (C) 2014-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2014-2021 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;;         Felix E. Klee <felix.klee@inka.de>
 ;; Keywords: image
-;; Version: 1.0
+;; Version: 1.1
 ;; Package-Requires: ((emacs "25"))
 
 ;; This file is part of GNU Emacs.
@@ -70,7 +70,9 @@ any further elements added."
 	      (height . ,height)
 	      (version . "1.1")
 	      (xmlns . "http://www.w3.org/2000/svg")
-	      ,@(svg--arguments nil args))))
+              ,@(unless (plist-get args :xmlns:xlink)
+                  '((xmlns:xlink . "http://www.w3.org/1999/xlink")))
+              ,@(svg--arguments nil args))))
 
 (defun svg-gradient (svg id type stops)
   "Add a gradient with ID to SVG.
@@ -180,6 +182,19 @@ otherwise.  IMAGE-TYPE should be a MIME image type, like
    (dom-node
     'image
     `((xlink:href . ,(svg--image-data image image-type datap))
+      ,@(svg--arguments svg args)))))
+
+(defun svg-embed-base-uri-image (svg relative-filename &rest args)
+  "Insert image placed at RELATIVE-FILENAME into the SVG structure.
+RELATIVE-FILENAME will be searched in `file-name-directory' of the
+image's `:base-uri' property.  If `:base-uri' is not specified for the
+image, then embedding won't work. Embedding large images using this
+function is much faster than `svg-embed'."
+  (svg--append
+   svg
+   (dom-node
+    'image
+    `((xlink:href . ,relative-filename)
       ,@(svg--arguments svg args)))))
 
 (defun svg-text (svg text &rest args)

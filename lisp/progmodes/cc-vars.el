@@ -1,6 +1,6 @@
 ;;; cc-vars.el --- user customization variables for CC Mode
 
-;; Copyright (C) 1985, 1987, 1992-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1985, 1987, 1992-2021 Free Software Foundation, Inc.
 
 ;; Authors:    2002- Alan Mackenzie
 ;;             1998- Martin Stjernholm
@@ -575,7 +575,9 @@ comment styles:
 
  javadoc -- Javadoc style for \"/** ... */\" comments (default in Java mode).
  autodoc -- Pike autodoc style for \"//! ...\" comments (default in Pike mode).
- gtkdoc  -- GtkDoc style for \"/** ... **/\" comments (default in C and C++ modes).
+ gtkdoc  -- GtkDoc style for \"/** ... **/\" comments
+						   (default in C and C++ modes).
+ doxygen -- Doxygen style.
 
 The value may also be a list of doc comment styles, in which case all
 of them are recognized simultaneously (presumably with markup cues
@@ -1669,7 +1671,8 @@ indented as a statement."
 like \"INLINE\" which are syntactic noise.  Such a macro/extension is complete
 in itself, never having parentheses.  All these names must be syntactically
 valid identifiers.  Alternatively, this variable may be a regular expression
-which matches the names of such macros.
+which matches the names of such macros, in which case it must have a submatch
+1 which matches the actual noise macro name.
 
 If you change this variable's value, call the function
 `c-make-noise-macro-regexps' to set the necessary internal variables (or do
@@ -1685,7 +1688,8 @@ this implicitly by reinitializing C/C++/Objc Mode on any buffer)."
 which optionally have arguments in parentheses, and which expand to nothing.
 All these names must be syntactically valid identifiers.  These are recognized
 by CC Mode only in declarations.  Alternatively, this variable may be a
-regular expression which matches the names of such macros.
+regular expression which matches the names of such macros, in which case it
+must have a submatch 1 which matches the actual noise macro name.
 
 If you change this variable's value, call the function
 `c-make-noise-macro-regexps' to set the necessary internal variables (or do

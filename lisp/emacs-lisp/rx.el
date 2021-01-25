@@ -1,6 +1,6 @@
 ;;; rx.el --- S-exp notation for regexps           --*- lexical-binding: t -*-
 
-;; Copyright (C) 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2021 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -255,9 +255,9 @@ Left-fold the list L, starting with X, by the binary function F."
   x)
 
 (defun rx--normalise-or-arg (form)
-  "Normalise the `or' argument FORM.
+  "Normalize the `or' argument FORM.
 Characters become strings, user-definitions and `eval' forms are expanded,
-and `or' forms are normalised recursively."
+and `or' forms are normalized recursively."
   (cond ((characterp form)
          (char-to-string form))
         ((and (consp form) (memq (car form) '(or |)))
@@ -1381,7 +1381,7 @@ To make local rx extensions, use `rx-let' for `rx',
 For more details, see Info node `(elisp) Extending Rx'.
 
 \(fn NAME [(ARGS...)] RX)"
-  (declare (indent 1))
+  (declare (indent defun))
   `(eval-and-compile
      (put ',name 'rx-definition ',(rx--make-binding name definition))
      ',name))
@@ -1413,11 +1413,12 @@ into a plain rx-expression, collecting names into `rx--pcase-vars'."
                 (mapconcat #'symbol-name rx--pcase-vars " ")))
        `(backref ,index)))
     ((and `(,head . ,rest)
-          (guard (and (symbolp head)
+          (guard (and (or (symbolp head) (memq head '(?\s ??)))
                       (not (memq head '(literal regexp regex eval))))))
      (cons head (mapcar #'rx--pcase-transform rest)))
     (_ rx)))
 
+;;;###autoload
 (pcase-defmacro rx (&rest regexps)
   "A pattern that matches strings against `rx' REGEXPS in sexp form.
 REGEXPS are interpreted as in `rx'.  The pattern matches any

@@ -1,6 +1,6 @@
 ;;; tramp-smb.el --- Tramp access functions for SMB servers  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2002-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2021 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
@@ -74,12 +74,23 @@
   :version "24.4")
 
 ;;;###tramp-autoload
-(defcustom tramp-smb-conf "/dev/null"
-  "Path of the smb.conf file.
-If it is nil, no smb.conf will be added to the `tramp-smb-program'
+(defcustom tramp-smb-conf null-device
+  "Path of the \"smb.conf\" file.
+If it is nil, no \"smb.conf\" will be added to the `tramp-smb-program'
 call, letting the SMB client use the default one."
   :group 'tramp
   :type '(choice (const nil) (file :must-match t)))
+
+;;;###tramp-autoload
+(defcustom tramp-smb-options nil
+  "List of additional options.
+They are added to the `tramp-smb-program' call via \"--option '...'\".
+
+For example, if the deprecated SMB1 protocol shall be used, add to
+this variable (\"client min protocol=NT1\") ."
+  :group 'tramp
+  :type '(repeat string)
+  :version "28.1")
 
 (defvar tramp-smb-version nil
   "Version string of the SMB client.")
@@ -135,6 +146,7 @@ call, letting the SMB client use the default one."
 	 "NT_STATUS_HOST_UNREACHABLE"
 	 "NT_STATUS_IMAGE_ALREADY_LOADED"
 	 "NT_STATUS_INVALID_LEVEL"
+	 "NT_STATUS_INVALID_PARAMETER"
 	 "NT_STATUS_INVALID_PARAMETER_MIX"
 	 "NT_STATUS_IO_TIMEOUT"
 	 "NT_STATUS_LOGON_FAILURE"
@@ -144,6 +156,7 @@ call, letting the SMB client use the default one."
 	 "NT_STATUS_NO_SUCH_FILE"
 	 "NT_STATUS_NO_SUCH_USER"
 	 "NT_STATUS_NOT_A_DIRECTORY"
+	 "NT_STATUS_NOT_SUPPORTED"
 	 "NT_STATUS_OBJECT_NAME_COLLISION"
 	 "NT_STATUS_OBJECT_NAME_INVALID"
 	 "NT_STATUS_OBJECT_NAME_NOT_FOUND"
@@ -281,6 +294,8 @@ See `tramp-actions-before-shell' for more info.")
     (start-file-process . tramp-smb-handle-start-file-process)
     (substitute-in-file-name . tramp-smb-handle-substitute-in-file-name)
     (temporary-file-directory . tramp-handle-temporary-file-directory)
+    (tramp-get-remote-gid . ignore)
+    (tramp-get-remote-uid . ignore)
     (tramp-set-file-uid-gid . ignore)
     (unhandled-file-name-directory . ignore)
     (vc-registered . ignore)
@@ -357,17 +372,17 @@ pass to the OPERATION."
 	(tramp-error
 	 v2 'file-error
 	 "add-name-to-file: %s must not be a directory" filename))
-	;; Do the 'confirm if exists' thing.
-	(when (file-exists-p newname)
-	  ;; What to do?
-	  (if (or (null ok-if-already-exists) ; not allowed to exist
-		  (and (numberp ok-if-already-exists)
-		       (not (yes-or-no-p
-			     (format
-			      "File %s already exists; make it a link anyway? "
-			      v2-localname)))))
-	      (tramp-error v2 'file-already-exists newname)
-	    (delete-file newname)))
+      ;; Do the 'confirm if exists' thing.
+      (when (file-exists-p newname)
+	;; What to do?
+	(if (or (null ok-if-already-exists) ; not allowed to exist
+		(and (numberp ok-if-already-exists)
+		     (not (yes-or-no-p
+			   (format
+			    "File %s already exists; make it a link anyway? "
+			    v2-localname)))))
+	    (tramp-error v2 'file-already-exists newname)
+	  (delete-file newname)))
       ;; We must also flush the cache of the directory, because
       ;; `file-attributes' reads the values from there.
       (tramp-flush-file-properties v2 v2-localname)
@@ -424,11 +439,7 @@ pass to the OPERATION."
 	  (cond
 	   ;; We must use a local temporary directory.
 	   ((and t1 t2)
-	    (let ((tmpdir
-		   (make-temp-name
-		    (expand-file-name
-		     tramp-temp-name-prefix
-		     (tramp-compat-temporary-file-directory)))))
+	    (let ((tmpdir (tramp-compat-make-temp-name)))
 	      (unwind-protect
 		  (progn
 		    (make-directory tmpdir)
@@ -454,13 +465,11 @@ pass to the OPERATION."
 
 	    (let* ((share (tramp-smb-get-share v))
 		   (localname (file-name-as-directory
-			       (replace-regexp-in-string
-				"\\\\" "/" (tramp-smb-get-localname v))))
-		   (tmpdir    (make-temp-name
-			       (expand-file-name
-				tramp-temp-name-prefix
-				(tramp-compat-temporary-file-directory))))
-		   (args      (list (concat "//" host "/" share) "-E")))
+			       (tramp-compat-string-replace
+				"\\" "/" (tramp-smb-get-localname v))))
+		   (tmpdir    (tramp-compat-make-temp-name))
+		   (args      (list (concat "//" host "/" share) "-E"))
+		   (options   tramp-smb-options))
 
 	      (if (not (zerop (length user)))
 		  (setq args (append args (list "-U" user)))
@@ -470,6 +479,10 @@ pass to the OPERATION."
 	      (when port   (setq args (append args (list "-p" port))))
 	      (when tramp-smb-conf
 		(setq args (append args (list "-s" tramp-smb-conf))))
+	      (while options
+		(setq args
+		      (append args `("--option" ,(format "%s" (car options))))
+		      options (cdr options)))
 	      (setq args
 		    (if t1
 			;; Source is remote.
@@ -623,41 +636,39 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	(file-attributes filename))
        (unless ok-if-already-exists 'nofollow)))))
 
-(defun tramp-smb-handle-delete-directory (directory &optional recursive _trash)
+(defun tramp-smb-handle-delete-directory (directory &optional recursive trash)
   "Like `delete-directory' for Tramp files."
-  (setq directory (directory-file-name (expand-file-name directory)))
-  (when (file-exists-p directory)
-    (when recursive
-      (mapc
-       (lambda (file)
-	 (if (file-directory-p file)
-	     (delete-directory file recursive)
-	   (delete-file file)))
-       ;; We do not want to delete "." and "..".
-       (directory-files directory 'full directory-files-no-dot-files-regexp)))
+  (tramp-skeleton-delete-directory directory recursive trash
+    (when (file-exists-p directory)
+      (when recursive
+	(mapc
+	 (lambda (file)
+	   (if (file-directory-p file)
+	       (delete-directory file recursive)
+	     (delete-file file)))
+	 ;; We do not want to delete "." and "..".
+	 (directory-files directory 'full directory-files-no-dot-files-regexp)))
 
-    (with-parsed-tramp-file-name directory nil
       ;; We must also flush the cache of the directory, because
       ;; `file-attributes' reads the values from there.
       (tramp-flush-directory-properties v localname)
       (unless (tramp-smb-send-command
 	       v (format
 		  "%s \"%s\""
-		  (if (tramp-smb-get-cifs-capabilities v) "posix_rmdir" "rmdir")
+		  (if (tramp-smb-get-cifs-capabilities v)
+		      "posix_rmdir" "rmdir")
 		  (tramp-smb-get-localname v)))
 	;; Error.
 	(with-current-buffer (tramp-get-connection-buffer v)
 	  (goto-char (point-min))
 	  (search-forward-regexp tramp-smb-errors nil t)
-	  (tramp-error
-	   v 'file-error "%s `%s'" (match-string 0) directory)))
+	  (tramp-error v 'file-error "%s `%s'" (match-string 0) directory)))
 
       ;; "rmdir" does not report an error.  So we check ourselves.
       (when (file-exists-p directory)
-	(tramp-error
-	 v 'file-error "`%s' not removed." directory)))))
+	(tramp-error v 'file-error "`%s' not removed." directory)))))
 
-(defun tramp-smb-handle-delete-file (filename &optional _trash)
+(defun tramp-smb-handle-delete-file (filename &optional trash)
   "Like `delete-file' for Tramp files."
   (setq filename (expand-file-name filename))
   (when (file-exists-p filename)
@@ -665,20 +676,21 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
       ;; We must also flush the cache of the directory, because
       ;; `file-attributes' reads the values from there.
       (tramp-flush-file-properties v localname)
-      (unless (tramp-smb-send-command
-	       v (format
-		  "%s \"%s\""
-		  (if (tramp-smb-get-cifs-capabilities v) "posix_unlink" "rm")
-		  (tramp-smb-get-localname v)))
-	;; Error.
-	(with-current-buffer (tramp-get-connection-buffer v)
-	  (goto-char (point-min))
-	  (search-forward-regexp tramp-smb-errors nil t)
-	  (tramp-error
-	   v 'file-error "%s `%s'" (match-string 0) filename))))))
+      (if (and delete-by-moving-to-trash trash)
+	  (move-file-to-trash filename)
+	(unless (tramp-smb-send-command
+		 v (format
+		    "%s \"%s\""
+		    (if (tramp-smb-get-cifs-capabilities v) "posix_unlink" "rm")
+		    (tramp-smb-get-localname v)))
+	  ;; Error.
+	  (with-current-buffer (tramp-get-connection-buffer v)
+	    (goto-char (point-min))
+	    (search-forward-regexp tramp-smb-errors nil t)
+	    (tramp-error v 'file-error "%s `%s'" (match-string 0) filename)))))))
 
 (defun tramp-smb-handle-directory-files
-  (directory &optional full match nosort)
+  (directory &optional full match nosort count)
   "Like `directory-files' for Tramp files."
   (unless (file-exists-p directory)
     (tramp-error
@@ -692,14 +704,22 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	    (delete nil
 		    (mapcar (lambda (x) (when (string-match-p match x) x))
 			    result))))
-    ;; Append directory.
+
+    ;; Sort them if necessary.
+    (unless nosort
+      (setq result (sort result #'string-lessp)))
+
+    ;; Return count number of results.
+    (when (and (natnump count) (> count 0))
+      (setq result (nbutlast result (- (length result) count))))
+
+    ;; Prepend directory.
     (when full
       (setq result
 	    (mapcar
-	     (lambda (x) (format "%s/%s" directory x))
+	     (lambda (x) (format "%s/%s" (directory-file-name directory) x))
 	     result)))
-    ;; Sort them if necessary.
-    (unless nosort (setq result (sort result #'string-lessp)))
+
     result))
 
 (defun tramp-smb-handle-expand-file-name (name &optional dir)
@@ -758,9 +778,10 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
       (with-tramp-file-property v localname "file-acl"
 	(when (executable-find tramp-smb-acl-program)
 	  (let* ((share     (tramp-smb-get-share v))
-		 (localname (replace-regexp-in-string
-			     "\\\\" "/" (tramp-smb-get-localname v)))
-		 (args      (list (concat "//" host "/" share) "-E")))
+		 (localname (tramp-compat-string-replace
+			     "\\" "/" (tramp-smb-get-localname v)))
+		 (args      (list (concat "//" host "/" share) "-E"))
+		 (options   tramp-smb-options))
 
 	    (if (not (zerop (length user)))
 		(setq args (append args (list "-U" user)))
@@ -770,10 +791,14 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	    (when port   (setq args (append args (list "-p" port))))
 	    (when tramp-smb-conf
 	      (setq args (append args (list "-s" tramp-smb-conf))))
+	    (while options
+	      (setq args
+		    (append args `("--option" ,(format "%s" (car options))))
+		    options (cdr options)))
 	    (setq
 	     args
 	     (append args (list (tramp-unquote-shell-quote-argument localname)
-				"2>/dev/null")))
+				(concat "2>" (tramp-get-remote-null-device v)))))
 
 	    (unwind-protect
 		(with-temp-buffer
@@ -858,23 +883,31 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	  (while (not (eobp))
 	    (cond
 	     ((looking-at
-	       "Size:\\s-+\\([0-9]+\\)\\s-+Blocks:\\s-+[0-9]+\\s-+\\(\\w+\\)")
+	       (concat
+		"Size:\\s-+\\([[:digit:]]+\\)\\s-+"
+		"Blocks:\\s-+[[:digit:]]+\\s-+\\(\\w+\\)"))
 	      (setq size (string-to-number (match-string 1))
 		    id (if (string-equal "directory" (match-string 2)) t
 			 (if (string-equal "symbolic" (match-string 2)) ""))))
 	     ((looking-at
-	       "Inode:\\s-+\\([0-9]+\\)\\s-+Links:\\s-+\\([0-9]+\\)")
+	       "Inode:\\s-+\\([[:digit:]]+\\)\\s-+Links:\\s-+\\([[:digit:]]+\\)")
 	      (setq inode (string-to-number (match-string 1))
 		    link (string-to-number (match-string 2))))
 	     ((looking-at
-	       "Access:\\s-+([0-9]+/\\(\\S-+\\))\\s-+Uid:\\s-+\\([0-9]+\\)\\s-+Gid:\\s-+\\([0-9]+\\)")
+	       (concat
+		"Access:\\s-+([[:digit:]]+/\\(\\S-+\\))\\s-+"
+		"Uid:\\s-+\\([[:digit:]]+\\)\\s-+"
+		"Gid:\\s-+\\([[:digit:]]+\\)"))
 	      (setq mode (match-string 1)
 		    uid (if (equal id-format 'string) (match-string 2)
 			  (string-to-number (match-string 2)))
 		    gid (if (equal id-format 'string) (match-string 3)
 			  (string-to-number (match-string 3)))))
 	     ((looking-at
-	       "Access:\\s-+\\([0-9]+\\)-\\([0-9]+\\)-\\([0-9]+\\)\\s-+\\([0-9]+\\):\\([0-9]+\\):\\([0-9]+\\)")
+	       (concat
+		"Access:\\s-+"
+		"\\([[:digit:]]+\\)-\\([[:digit:]]+\\)-\\([[:digit:]]+\\)\\s-+"
+		"\\([[:digit:]]+\\):\\([[:digit:]]+\\):\\([[:digit:]]+\\)"))
 	      (setq atime
 		    (encode-time
 		     (string-to-number (match-string 6)) ;; sec
@@ -884,7 +917,10 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 		     (string-to-number (match-string 2)) ;; month
 		     (string-to-number (match-string 1))))) ;; year
 	     ((looking-at
-	       "Modify:\\s-+\\([0-9]+\\)-\\([0-9]+\\)-\\([0-9]+\\)\\s-+\\([0-9]+\\):\\([0-9]+\\):\\([0-9]+\\)")
+	       (concat
+		"Modify:\\s-+"
+		"\\([[:digit:]]+\\)-\\([[:digit:]]+\\)-\\([[:digit:]]+\\)\\s-+"
+		"\\([[:digit:]]+\\):\\([[:digit:]]+\\):\\([[:digit:]]+\\)"))
 	      (setq mtime
 		    (encode-time
 		     (string-to-number (match-string 6)) ;; sec
@@ -894,7 +930,10 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 		     (string-to-number (match-string 2)) ;; month
 		     (string-to-number (match-string 1))))) ;; year
 	     ((looking-at
-	       "Change:\\s-+\\([0-9]+\\)-\\([0-9]+\\)-\\([0-9]+\\)\\s-+\\([0-9]+\\):\\([0-9]+\\):\\([0-9]+\\)")
+	       (concat
+		"Change:\\s-+"
+		"\\([[:digit:]]+\\)-\\([[:digit:]]+\\)-\\([[:digit:]]+\\)\\s-+"
+		"\\([[:digit:]]+\\):\\([[:digit:]]+\\):\\([[:digit:]]+\\)"))
 	      (setq ctime
 		    (encode-time
 		     (string-to-number (match-string 6)) ;; sec
@@ -970,10 +1009,9 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 	    (goto-char (point-min))
 	    (forward-line)
 	    (when (looking-at
-		   (eval-when-compile
-		     (concat "[[:space:]]*\\([[:digit:]]+\\)"
-			     " blocks of size \\([[:digit:]]+\\)"
-			     "\\. \\([[:digit:]]+\\) blocks available")))
+		   (concat "[[:space:]]*\\([[:digit:]]+\\)"
+			   " blocks of size \\([[:digit:]]+\\)"
+			   "\\. \\([[:digit:]]+\\) blocks available"))
 	      (setq blocksize (string-to-number (match-string 2))
 		    total (* blocksize (string-to-number (match-string 1)))
 		    avail (* blocksize (string-to-number (match-string 3)))))
@@ -1129,7 +1167,6 @@ PRESERVE-UID-GID and PRESERVE-EXTENDED-ATTRIBUTES are completely ignored."
 		   (insert " -> " (tramp-compat-file-attribute-type attr))))
 
 	       (insert "\n")
-	       (forward-line)
 	       (beginning-of-line)))
 	   entries))))))
 
@@ -1408,11 +1445,12 @@ component is used as the target of the symlink."
 
       (when (and (stringp acl-string) (executable-find tramp-smb-acl-program))
 	(let* ((share     (tramp-smb-get-share v))
-	       (localname (replace-regexp-in-string
-			   "\\\\" "/" (tramp-smb-get-localname v)))
+	       (localname (tramp-compat-string-replace
+			   "\\" "/" (tramp-smb-get-localname v)))
 	       (args      (list (concat "//" host "/" share) "-E" "-S"
-				(replace-regexp-in-string
-				 "\n" "," acl-string))))
+				(tramp-compat-string-replace
+				 "\n" "," acl-string)))
+	       (options   tramp-smb-options))
 
 	  (if (not (zerop (length user)))
 	      (setq args (append args (list "-U" user)))
@@ -1422,6 +1460,10 @@ component is used as the target of the symlink."
 	  (when port   (setq args (append args (list "-p" port))))
 	  (when tramp-smb-conf
 	    (setq args (append args (list "-s" tramp-smb-conf))))
+	  (while options
+	    (setq args
+		  (append args `("--option" ,(format "%s" (car options))))
+		  options (cdr options)))
 	  (setq
 	   args
 	   (append args (list (tramp-unquote-shell-quote-argument localname)
@@ -1452,7 +1494,7 @@ component is used as the target of the symlink."
 		  ;; This is meant for traces, and returning from the
 		  ;; function.  No error is propagated outside, due to
 		  ;; the `ignore-errors' closure.
-		  (unless (tramp-search-regexp "tramp_exit_status [0-9]+")
+		  (unless (tramp-search-regexp "tramp_exit_status [[:digit:]]+")
 		    (tramp-error
 		     v 'file-error
 		     "Couldn't find exit status of `%s'" tramp-smb-acl-program))
@@ -1557,9 +1599,6 @@ errors for shares like \"C$/\", which are common in Microsoft Windows."
 		     (format "File %s exists; overwrite anyway? " filename)))))
       (tramp-error v 'file-already-exists filename))
 
-    ;; We must also flush the cache of the directory, because
-    ;; `file-attributes' reads the values from there.
-    (tramp-flush-file-properties v localname)
     (let ((curbuf (current-buffer))
 	  (tmpfile (tramp-compat-make-temp-file filename)))
       (when (and append (file-exists-p filename))
@@ -1579,6 +1618,10 @@ errors for shares like \"C$/\", which are common in Microsoft Windows."
 	      (tramp-error v 'file-error "Cannot write `%s'" filename))
 	  (delete-file tmpfile)))
 
+      ;; We must also flush the cache of the directory, because
+      ;; `file-attributes' reads the values from there.
+      (tramp-flush-file-properties v localname)
+
       (unless (equal curbuf (current-buffer))
 	(tramp-error
 	 v 'file-error
@@ -1587,8 +1630,9 @@ errors for shares like \"C$/\", which are common in Microsoft Windows."
       ;; Set file modification time.
       (when (or (eq visit t) (stringp visit))
 	(set-visited-file-modtime
-	 (tramp-compat-file-attribute-modification-time
-	  (file-attributes filename))))
+	 (or (tramp-compat-file-attribute-modification-time
+	      (file-attributes filename))
+	     (current-time))))
 
       ;; The end.
       (when (and (null noninteractive)
@@ -1696,21 +1740,21 @@ Result is a list of (LOCALNAME MODE SIZE MONTH DAY TIME YEAR)."
 ;; Entries provided by smbclient DIR aren't fully regular.
 ;; They should have the format
 ;;
-;; \s-\{2,2}                              - leading spaces
+;; \s-\{2,2\}                             - leading spaces
 ;; \S-\(.*\S-\)\s-*                       - file name, 30 chars, left bound
 ;; \s-+[ADHRSV]*                          - permissions, 7 chars, right bound
 ;; \s-                                    - space delimiter
-;; \s-+[0-9]+                             - size, 8 chars, right bound
+;; \s-+[[:digit:]]+                       - size, 8 chars, right bound
 ;; \s-\{2,2\}                             - space delimiter
 ;; \w\{3,3\}                              - weekday
 ;; \s-                                    - space delimiter
 ;; \w\{3,3\}                              - month
 ;; \s-                                    - space delimiter
-;; [ 12][0-9]                             - day
+;; [ 12][[:digit:]]                       - day
 ;; \s-                                    - space delimiter
-;; [0-9]\{2,2\}:[0-9]\{2,2\}:[0-9]\{2,2\} - time
+;; [[:digit:]]\{2,2\}:[[:digit:]]\{2,2\}:[[:digit:]]\{2,2\} - time
 ;; \s-                                    - space delimiter
-;; [0-9]\{4,4\}                           - year
+;; [[:digit:]]\{4,4\}                     - year
 ;;
 ;; samba/src/client.c (http://samba.org/doxygen/samba/client_8c-source.html)
 ;; has function display_finfo:
@@ -1758,13 +1802,14 @@ are listed.  Result is the list (LOCALNAME MODE SIZE MTIME)."
       (cl-block nil
 
 	;; year.
-	(if (string-match "\\([0-9]+\\)$" line)
+	(if (string-match "\\([[:digit:]]+\\)$" line)
 	    (setq year (string-to-number (match-string 1 line))
 		  line (substring line 0 -5))
 	  (cl-return))
 
 	;; time.
-	(if (string-match "\\([0-9]+\\):\\([0-9]+\\):\\([0-9]+\\)$" line)
+	(if (string-match
+	     "\\([[:digit:]]+\\):\\([[:digit:]]+\\):\\([[:digit:]]+\\)$" line)
 	    (setq hour (string-to-number (match-string 1 line))
 		  min  (string-to-number (match-string 2 line))
 		  sec  (string-to-number (match-string 3 line))
@@ -1772,7 +1817,7 @@ are listed.  Result is the list (LOCALNAME MODE SIZE MTIME)."
 	  (cl-return))
 
 	;; day.
-	(if (string-match "\\([0-9]+\\)$" line)
+	(if (string-match "\\([[:digit:]]+\\)$" line)
 	    (setq day  (string-to-number (match-string 1 line))
 		  line (substring line 0 -3))
 	  (cl-return))
@@ -1789,7 +1834,7 @@ are listed.  Result is the list (LOCALNAME MODE SIZE MTIME)."
 	  (cl-return))
 
 	;; size.
-	(if (string-match "\\([0-9]+\\)$" line)
+	(if (string-match "\\([[:digit:]]+\\)$" line)
 	    (let ((length (- (max 10 (1+ (length (match-string 1 line)))))))
 	      (setq size (string-to-number (match-string 1 line)))
 	      (when (string-match
@@ -1844,7 +1889,7 @@ are listed.  Result is the list (LOCALNAME MODE SIZE MTIME)."
   (if (and (process-live-p (tramp-get-connection-process vec))
 	   (tramp-get-connection-property vec "posix" t))
       (with-tramp-connection-property
-	  (tramp-get-connection-process vec) "cifs-capabilities"
+	  (tramp-get-process vec) "cifs-capabilities"
 	(save-match-data
 	  (when (tramp-smb-send-command vec "posix")
 	    (with-current-buffer (tramp-get-connection-buffer vec)
@@ -1861,8 +1906,7 @@ are listed.  Result is the list (LOCALNAME MODE SIZE MTIME)."
   ;; When we are not logged in yet, we return nil.
   (if (and (tramp-smb-get-share vec)
 	   (process-live-p (tramp-get-connection-process vec)))
-      (with-tramp-connection-property
-	  (tramp-get-connection-process vec) "stat-capability"
+      (with-tramp-connection-property (tramp-get-process vec) "stat-capability"
 	(tramp-smb-send-command vec "stat \"/\""))))
 
 
@@ -1947,6 +1991,7 @@ If ARGUMENT is non-nil, use it as argument for
 	       (host   (tramp-file-name-host vec))
 	       (domain (tramp-file-name-domain vec))
 	       (port   (tramp-file-name-port vec))
+	       (options tramp-smb-options)
 	       args)
 
 	  (cond
@@ -1965,6 +2010,10 @@ If ARGUMENT is non-nil, use it as argument for
 	  (when port   (setq args (append args (list "-p" port))))
 	  (when tramp-smb-conf
 	    (setq args (append args (list "-s" tramp-smb-conf))))
+	  (while options
+	    (setq args
+		  (append args `("--option" ,(format "%s" (car options))))
+		  options (cdr options)))
 	  (when argument
 	    (setq args (append args (list argument))))
 
@@ -1990,6 +2039,9 @@ If ARGUMENT is non-nil, use it as argument for
 	      (process-put p 'vector vec)
 	      (process-put p 'adjust-window-size-function #'ignore)
 	      (set-process-query-on-exit-flag p nil)
+
+	      ;; Set connection-local variables.
+	      (tramp-set-connection-local-variables vec)
 
 	      (condition-case err
 		  (let ((inhibit-message t))
@@ -2023,9 +2075,6 @@ If ARGUMENT is non-nil, use it as argument for
 		    ;; at once, it is read painfully slow.
 		    (tramp-set-connection-property p "smb-share" share)
 		    (tramp-set-connection-property p "chunksize" 1)
-
-		    ;; Set connection-local variables.
-		    (tramp-set-connection-local-variables vec)
 
 		    ;; Mark it as connected.
 		    (tramp-set-connection-property p "connected" t))
@@ -2098,8 +2147,7 @@ Removes smb prompt.  Returns nil if an error message has appeared."
     "%s %s"
     tramp-smb-winexe-shell-command tramp-smb-winexe-shell-command-switch))
 
-  (set (make-local-variable 'kill-buffer-hook)
-       '(tramp-smb-kill-winexe-function))
+  (add-hook 'kill-buffer-hook #'tramp-smb-kill-winexe-function nil t)
 
   ;; Suppress "^M".  Shouldn't we specify utf8?
   (set-process-coding-system (tramp-get-connection-process vec) 'raw-text-dos)

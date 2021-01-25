@@ -1,6 +1,6 @@
 ;;; ebnf-ebx.el --- parser for EBNF used to specify XML (EBNFX)
 
-;; Copyright (C) 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2021 Free Software Foundation, Inc.
 
 ;; Author: Vinicius Jose Latorre <viniciusjl.gnu@gmail.com>
 ;; Keywords: wp, ebnf, PostScript
@@ -38,7 +38,7 @@
 ;; ------------
 ;;
 ;;	See the URL:
-;;	`http://www.w3.org/TR/2004/REC-xml-20040204/#sec-notation'
+;;	`https://www.w3.org/TR/2004/REC-xml-20040204/#sec-notation'
 ;;	(Extensible Markup Language (XML) 1.0 (Third Edition))
 ;;
 ;;

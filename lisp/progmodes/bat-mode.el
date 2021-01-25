@@ -1,6 +1,6 @@
 ;;; bat-mode.el --- Major mode for editing DOS/Windows scripts
 
-;; Copyright (C) 2003, 2008-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2003, 2008-2021 Free Software Foundation, Inc.
 
 ;; Author: Arni Magnusson <arnima@hafro.is>
 ;; Keywords: languages
@@ -42,7 +42,7 @@
 ;; See documentation of function `bat-mode'.
 ;;
 ;; Separate package `dos-indent' (Matthew Fidler) provides rudimentary
-;; indentation, see http://www.emacswiki.org/emacs/dos-indent.el.
+;; indentation, see https://www.emacswiki.org/emacs/dos-indent.el.
 ;;
 ;; Acknowledgements:
 ;;

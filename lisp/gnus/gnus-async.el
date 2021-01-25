@@ -1,6 +1,6 @@
 ;;; gnus-async.el --- asynchronous support for Gnus  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1996-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2021 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -227,6 +227,7 @@ that was fetched."
 	  (narrow-to-region mark (point-max))
 	  ;; Put the articles into the agent, if they aren't already.
 	  (when (and gnus-agent
+		     gnus-agent-eagerly-store-articles
 		     (gnus-agent-group-covered-p group))
 	    (save-restriction
 	      (narrow-to-region mark (point-max))
@@ -356,8 +357,13 @@ that was fetched."
 	(let ((nntp-server-buffer (current-buffer))
 	      (nnheader-callback-function
 	       (lambda (_arg)
-		  (setq gnus-async-header-prefetched
-			(cons group unread)))))
+		 (setq gnus-async-header-prefetched
+		       (cons group unread)))))
+	  ;; FIXME: If header prefetch is ever put into use, we'll
+	  ;; have to handle the possibility that
+	  ;; `gnus-retrieve-headers' might return a list of header
+	  ;; vectors directly, rather than writing them into the
+	  ;; current buffer.
 	  (gnus-retrieve-headers unread group gnus-fetch-old-headers))))))
 
 (defun gnus-async-retrieve-fetched-headers (articles group)

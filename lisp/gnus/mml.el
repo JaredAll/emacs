@@ -1,6 +1,6 @@
 ;;; mml.el --- A package for parsing and validating MML documents
 
-;; Copyright (C) 1998-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2021 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; This file is part of GNU Emacs.
@@ -281,7 +281,7 @@ part.  This is for the internal use, you should never modify the value.")
 	    (setq tag (mml-read-tag)
 		  no-markup-p nil
 		  warn nil)
-	  (setq tag (list 'part '(type . "text/plain"))
+	  (setq tag (list 'part (cons 'type "text/plain"))
 		no-markup-p t
 		warn t))
 	(setq raw (cdr (assq 'raw tag))
@@ -295,6 +295,17 @@ part.  This is for the internal use, you should never modify the value.")
 			(t
 			 (mm-find-mime-charset-region point (point)
 						      mm-hack-charsets))))
+	;; We have a part that already has a transfer encoding.  Undo
+	;; that so that we don't double-encode later.
+	(when (and raw
+		   (cdr (assq 'data-encoding tag)))
+	  (with-temp-buffer
+	    (set-buffer-multibyte nil)
+	    (insert contents)
+	    (mm-decode-content-transfer-encoding
+	     (intern (cdr (assq 'data-encoding tag)))
+	     (cdr (assq 'type tag)))
+	    (setq contents (buffer-string))))
 	(when (and (not raw) (memq nil charsets))
 	  (if (or (memq 'unknown-encoding mml-confirmation-set)
 		  (message-options-get 'unknown-encoding)
@@ -313,8 +324,8 @@ Message contains characters with unknown encoding.  Really send? ")
 		(eq 'mml (car tag))
 		(< (length charsets) 2))
 	    (if (or (not no-markup-p)
+		    ;; Don't create blank parts.
 		    (string-match "[^ \t\r\n]" contents))
-		;; Don't create blank parts.
 		(push (nconc tag (list (cons 'contents contents)))
 		      struct))
 	  (let ((nstruct (mml-parse-singlepart-with-multiple-charsets
@@ -1255,8 +1266,8 @@ See Info node `(emacs-mime)Composing'.
   :lighter " MML" :keymap mml-mode-map
   (when mml-mode
     (when (boundp 'dnd-protocol-alist)
-      (set (make-local-variable 'dnd-protocol-alist)
-	   (append mml-dnd-protocol-alist dnd-protocol-alist)))))
+      (setq-local dnd-protocol-alist
+                  (append mml-dnd-protocol-alist dnd-protocol-alist)))))
 
 ;;;
 ;;; Helper functions for reading MIME stuff from the minibuffer and
@@ -1349,7 +1360,7 @@ If not set, `default-directory' will be used."
 	  (value (pop plist)))
       (when value
 	;; Quote VALUE if it contains suspicious characters.
-	(when (string-match "[\"'\\~/*;() \t\n[:multibyte:]]" value)
+	(when (string-match "[][\"'\\~/*;()<>= \t\n[:multibyte:]]" value)
 	  (setq value (with-output-to-string
 			(let (print-escape-nonascii)
 			  (prin1 value)))))

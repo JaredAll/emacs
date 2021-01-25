@@ -1,6 +1,6 @@
 @c -*- mode: texinfo; coding: utf-8 -*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990--1993, 1995, 1998--1999, 2001--2020 Free Software
+@c Copyright (C) 1990--1993, 1995, 1998--1999, 2001--2021 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Tips
@@ -8,6 +8,7 @@
 @cindex tips for writing Lisp
 @cindex standards of coding style
 @cindex coding standards
+@cindex best practices
 
   This chapter describes no additional features of Emacs Lisp.  Instead
 it gives advice on making effective use of the features described in the
@@ -94,6 +95,11 @@ If one prefix is insufficient, your package can use two or three
 alternative common prefixes, so long as they make sense.
 
 @item
+We recommend enabling @code{lexical-binding} in new code, and
+converting existing Emacs Lisp code to enable @code{lexical-binding}
+if it doesn't already.  @xref{Using Lexical Binding}.
+
+@item
 Put a call to @code{provide} at the end of each separate Lisp file.
 @xref{Named Features}.
 
@@ -133,17 +139,8 @@ your file do not need to load the extra library.
 
 @item
 If you need Common Lisp extensions, use the @code{cl-lib} library
-rather than the old @code{cl} library.  The latter does not
-use a clean namespace (i.e., its definitions do not
-start with a @samp{cl-} prefix).  If your package loads @code{cl} at
-run time, that could cause name clashes for users who don't use that
-package.
-
-There is no problem with using the @code{cl} package at @emph{compile}
-time, with @code{(eval-when-compile (require 'cl))}.  That's
-sufficient for using the macros in the @code{cl} package, because the
-compiler expands them before generating the byte-code.  It is still
-better to use the more modern @code{cl-lib} in this case, though.
+rather than the old @code{cl} library.  The latter library is
+deprecated and will be removed in a future version of Emacs.
 
 @item
 When defining a major mode, please follow the major mode
@@ -277,8 +274,9 @@ implementing such clickable links.
 @cindex keys, reserved
 Don't define @kbd{C-c @var{letter}} as a key in Lisp programs.
 Sequences consisting of @kbd{C-c} and a letter (either upper or lower
-case) are reserved for users; they are the @strong{only} sequences
-reserved for users, so do not block them.
+case; @acronym{ASCII} or non-@acronym{ASCII}) are reserved for users;
+they are the @strong{only} sequences reserved for users, so do not
+block them.
 
 Changing all the Emacs major modes to respect this convention was a
 lot of work; abandoning this convention would make that work go to
@@ -820,6 +818,14 @@ most cases, the meaning is clear with just ``if''.  Otherwise, try to
 find an alternate phrasing that conveys the meaning.
 
 @item
+Try to avoid using abbreviations such as ``e.g.'' (for ``for
+example''), ``i.e.'' (for ``that is''), ``no.'' (for ``number''),
+``c.f.'' (for ``in contrast to'') and ``w.r.t.'' (for ``with respect
+to'') as much as possible.  It is almost always clearer and easier to
+read the expanded version.@footnote{We do use these occasionally, but
+try not to overdo it.}
+
+@item
 When a command is meaningful only in a certain mode or situation,
 do mention that in the documentation string.  For example,
 the documentation of @code{dired-find-file} is:
@@ -909,29 +915,56 @@ values.  It is much better to convert such comments to documentation
 strings, though.
 
 @item ;;;
-Comments that start with three semicolons, @samp{;;;}, should start at
-the left margin.  We use them
-for comments which should be considered a
-heading by Outline minor mode.  By default, comments starting with
-at least three semicolons (followed by a single space and a
-non-whitespace character) are considered headings, comments starting
-with two or fewer are not.  Historically, triple-semicolon comments have
-also been used for commenting out lines within a function, but this use
-is discouraged.
 
-When commenting out entire functions, use two semicolons.
+Comments that start with three (or more) semicolons, @samp{;;;},
+should start at the left margin.  We use them for comments that should
+be considered a heading by Outline minor mode.  By default, comments
+starting with at least three semicolons (followed by a single space
+and a non-whitespace character) are considered section headings,
+comments starting with two or fewer are not.
 
-@item ;;;;
-Comments that start with four (or more) semicolons, @samp{;;;;},
-should be aligned to the left margin and are used for headings of
-major sections of a program.  For example:
+(Historically, triple-semicolon comments have also been used for
+commenting out lines within a function, but this use is discouraged in
+favor of using just two semicolons.  This also applies when commenting
+out entire functions; when doing that use two semicolons as well.)
+
+Three semicolons are used for top-level sections, four for
+sub-sections, five for sub-sub-sections and so on.
+
+Typically libraries have at least four top-level sections.  For
+example when the bodies of all of these sections are hidden:
 
 @smallexample
-;;;; The kill ring
+@group
+;;; backquote.el --- implement the ` Lisp construct...
+;;; Commentary:...
+;;; Code:...
+;;; backquote.el ends here
+@end group
 @end smallexample
 
-If you wish to have sub-headings under these heading, use more
-semicolons to nest these sub-headings.
+(In a sense the last line is not a section heading as it must
+never be followed by any text; after all it marks the end of the
+file.)
+
+For longer libraries it is advisable to split the code into multiple
+sections.  This can be done by splitting the @samp{Code:} section into
+multiple sub-sections.  Even though that was the only recommended
+approach for a long time, many people have chosen to use multiple
+top-level code sections instead.  You may chose either style.
+
+Using multiple top-level code sections has the advantage that it
+avoids introducing an additional nesting level but it also means that
+the section named @samp{Code} does not contain all the code, which is
+awkward.  To avoid that, you should put no code at all inside that
+section; that way it can be considered a separator instead of a
+section heading.
+
+Finally, we recommend that you don't end headings with a colon or any
+other punctuation for that matter.  For historic reasons the
+@samp{Code:} and @samp{Commentary:} headings end with a colon, but we
+recommend that you don't do the same for other headings anyway.
+
 @end table
 
 @noindent
@@ -954,9 +987,9 @@ explains these conventions, starting with an example:
 
 @smallexample
 @group
-;;; foo.el --- Support for the Foo programming language
+;;; foo.el --- Support for the Foo programming language  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2010-2020 Your Name
+;; Copyright (C) 2010-2021 Your Name
 @end group
 
 ;; Author: Your Name <yourname@@example.com>
@@ -977,14 +1010,14 @@ explains these conventions, starting with an example:
   The very first line should have this format:
 
 @example
-;;; @var{filename} --- @var{description}
+;;; @var{filename} --- @var{description}  -*- lexical-binding: t; -*-
 @end example
 
 @noindent
-The description should be contained in one line.  If the file
-needs a @samp{-*-} specification, put it after @var{description}.
-If this would make the first line too long, use a Local Variables
-section at the end of the file.
+The description should be contained in one line.  If the file needs to
+set more variables in the @samp{-*-} specification, add it after
+@code{lexical-binding}.  If this would make the first line too long, use
+a Local Variables section at the end of the file.
 
   The copyright notice usually lists your name (if you wrote the
 file).  If you have an employer who claims copyright on your work, you

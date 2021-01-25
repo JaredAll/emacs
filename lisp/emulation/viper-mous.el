@@ -1,6 +1,6 @@
 ;;; viper-mous.el --- mouse support for Viper
 
-;; Copyright (C) 1994-1997, 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1994-1997, 2001-2021 Free Software Foundation, Inc.
 
 ;; Author: Michael Kifer <kifer@cs.stonybrook.edu>
 ;; Package: viper
@@ -98,7 +98,7 @@ considered related."
 ;;; Code
 
 (defsubst viper-multiclick-p ()
-  (not (viper-sit-for-short viper-multiclick-timeout t)))
+  (not (sit-for (/ viper-multiclick-timeout 1000.0) t)))
 
 ;; Returns window where click occurs
 (defun viper-mouse-click-window (click)

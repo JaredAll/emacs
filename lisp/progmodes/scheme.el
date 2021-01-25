@@ -1,6 +1,6 @@
 ;;; scheme.el --- Scheme (and DSSSL) editing mode    -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1986-1988, 1997-1998, 2001-2020 Free Software
+;; Copyright (C) 1986-1988, 1997-1998, 2001-2021 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Bill Rozas <jinx@martigny.ai.mit.edu>
@@ -116,7 +116,7 @@
 
 (defvar scheme-imenu-generic-expression
       '((nil
-         "^(define\\(\\|-\\(generic\\(\\|-procedure\\)\\|method\\)\\)*\\s-+(?\\(\\sw+\\)" 4)
+         "^(define\\(?:-\\(?:generic\\(?:-procedure\\)?\\|method\\)\\)?\\s-+(?\\(\\sw+\\)" 1)
         ("Types"
          "^(define-class\\s-+(?\\(\\sw+\\)" 1)
         ("Macros"

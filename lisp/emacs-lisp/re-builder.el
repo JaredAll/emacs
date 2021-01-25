@@ -1,6 +1,6 @@
 ;;; re-builder.el --- building Regexps with visual feedback -*- lexical-binding: t -*-
 
-;; Copyright (C) 1999-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2021 Free Software Foundation, Inc.
 
 ;; Author: Detlev Zundel <dzu@gnu.org>
 ;; Keywords: matching, lisp, tools
@@ -96,7 +96,7 @@
 ;;    out.
 
 ;; Q: But how can I then make out the sub-expressions?
-;; A: Thats where the `sub-expression mode' comes in.  In it only the
+;; A: That's where the `sub-expression mode' comes in.  In it only the
 ;;    digit keys are assigned to perform an update that will flash the
 ;;    corresponding subexp only.
 
@@ -271,7 +271,7 @@ Except for Lisp syntax this is the same as `reb-regexp'.")
 
 (define-derived-mode reb-mode nil "RE Builder"
   "Major mode for interactively building Regular Expressions."
-  (set (make-local-variable 'blink-matching-paren) nil)
+  (setq-local blink-matching-paren nil)
   (reb-mode-common))
 
 (defvar reb-lisp-mode-map
@@ -301,7 +301,7 @@ Except for Lisp syntax this is the same as `reb-regexp'.")
   "Keymap used by the RE Builder for the subexpression mode.")
 
 (defun reb-mode-common ()
-  "Setup functions common to functions `reb-mode' and `reb-mode-lisp'."
+  "Setup functions common to functions `reb-mode' and `reb-lisp-mode'."
 
   (setq	reb-mode-string  ""
 	reb-valid-string ""
@@ -489,7 +489,7 @@ Optional argument SYNTAX must be specified if called non-interactively."
   (interactive
    (list (intern
 	  (completing-read
-	   (format "Select syntax (default %s): " reb-re-syntax)
+	   (format-prompt "Select syntax" reb-re-syntax)
 	   '(read string sregex rx)
 	   nil t nil nil (symbol-name reb-re-syntax)
            'reb-change-syntax-hist))))
@@ -513,7 +513,7 @@ If SUBEXP is non-nil mark only the corresponding sub-expressions."
   (reb-update-overlays subexp))
 
 (defun reb-auto-update (_beg _end _lenold &optional force)
-  "Called from `after-update-functions' to update the display.
+  "Called from `after-change-functions' to update the display.
 BEG, END and LENOLD are passed in from the hook.
 An actual update is only done if the regexp has changed or if the
 optional fourth argument FORCE is non-nil."
@@ -767,22 +767,21 @@ If SUBEXP is non-nil mark only the corresponding sub-expressions."
      (reb-mark-non-matching-parenthesis))
     nil)))
 
-(defsubst reb-while (limit counter where)
-  (let ((count (symbol-value counter)))
-    (if (= count limit)
-        (progn
-          (message "Reached (while limit=%s, where=%s)" limit where)
-          nil)
-      (set counter (1+ count)))))
+(defsubst reb-while (limit current where)
+  (if (< current limit)
+      (1+ current)
+    (message "Reached (while limit=%s, where=%s)" limit where)
+    nil))
 
 (defun reb-mark-non-matching-parenthesis (bound)
   ;; We have a small string, check the whole of it, but wait until
   ;; everything else is fontified.
   (when (>= bound (point-max))
-    (let (left-pars
+    (let ((n-reb 0)
+          left-pars
           faces-here)
       (goto-char (point-min))
-      (while (and (reb-while 100 'n-reb "mark-par")
+      (while (and (setq n-reb (reb-while 100 n-reb "mark-par"))
                   (not (eobp)))
         (skip-chars-forward "^()")
         (unless (eobp)
@@ -833,8 +832,8 @@ If SUBEXP is non-nil mark only the corresponding sub-expressions."
     (let ((font-lock-is-on font-lock-mode))
       (font-lock-mode -1)
       (kill-local-variable 'font-lock-set-defaults)
-      ;;(set (make-local-variable 'reb-re-syntax) 'string)
-      ;;(set (make-local-variable 'reb-re-syntax) 'rx)
+      ;;(setq-local reb-re-syntax 'string)
+      ;;(setq-local reb-re-syntax 'rx)
       (setq font-lock-defaults
             (cond
              ((memq reb-re-syntax '(read string))

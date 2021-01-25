@@ -1000,10 +1000,10 @@ map_sub_char_table_for_charset (void (*c_function) (Lisp_Object, Lisp_Object),
    "mapping table" or a "deunifier table" of a certain charset.
 
    If CHARSET is not NULL (this is the case that `map-charset-chars'
-   is called with non-nil FROM-CODE and TO-CODE), it is a charset who
-   owns TABLE, and the function is called only on a character in the
+   is called with non-nil FROM-CODE and TO-CODE), it is a charset that
+   owns TABLE, and the function is called only for characters in the
    range FROM and TO.  FROM and TO are not character codes, but code
-   points of a character in CHARSET.
+   points of characters in CHARSET (see 'decode-char').
 
    This function is called in these two cases:
 
@@ -1117,10 +1117,10 @@ uniprop_table_uncompress (Lisp_Object table, int idx)
     {
       /* SIMPLE TABLE */
       p++;
-      idx = STRING_CHAR_ADVANCE (p);
+      idx = string_char_advance (&p);
       while (p < pend && idx < chartab_chars[2])
 	{
-	  int v = STRING_CHAR_ADVANCE (p);
+	  int v = string_char_advance (&p);
 	  set_sub_char_table_contents
 	    (sub, idx++, v > 0 ? make_fixnum (v) : Qnil);
 	}
@@ -1131,13 +1131,13 @@ uniprop_table_uncompress (Lisp_Object table, int idx)
       p++;
       for (idx = 0; p < pend; )
 	{
-	  int v = STRING_CHAR_ADVANCE (p);
+	  int v = string_char_advance (&p);
 	  int count = 1;
-	  int len;
 
 	  if (p < pend)
 	    {
-	      count = STRING_CHAR_AND_LENGTH (p, len);
+	      int len;
+	      count = string_char_and_length (p, &len);
 	      if (count < 128)
 		count = 1;
 	      else

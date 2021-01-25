@@ -1,21 +1,23 @@
 ;;; simple-test.el --- Tests for simple.el           -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2015-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2021 Free Software Foundation, Inc.
 
 ;; Author: Artur Malabarba <bruce.connor.am@gmail.com>
 
-;; This program is free software; you can redistribute it and/or modify
+;; This file is part of GNU Emacs.
+
+;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; This program is distributed in the hope that it will be useful,
+;; GNU Emacs is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Code:
 
@@ -37,6 +39,13 @@
      (save-excursion (insert " c d)"))
      ,@body
      (with-no-warnings (simple-test--buffer-substrings))))
+
+
+;;; `count-words'
+(ert-deftest simple-test-count-words-bug-41761 ()
+  (with-temp-buffer
+    (dotimes (_i 10) (insert (propertize "test " 'field (cons nil nil))))
+    (should (= (count-words (point-min) (point-max)) 10))))
 
 
 ;;; `transpose-sexps'
@@ -757,17 +766,17 @@ See Bug#21722."
 ;;; Tests for shell-command-dont-erase-buffer
 
 (defmacro with-shell-command-dont-erase-buffer (str output-buffer-is-current &rest body)
-  (declare (debug (form &body)) (indent 2))
-  (let ((expected (make-symbol "expected"))
-        (command (make-symbol "command"))
+  (declare (debug (sexp form body)) (indent 2))
+  (let ((command (make-symbol "command"))
         (caller-buf (make-symbol "caller-buf"))
         (output-buf (make-symbol "output-buf")))
     `(let* ((,caller-buf (generate-new-buffer "caller-buf"))
             (,output-buf (if ,output-buffer-is-current ,caller-buf
                            (generate-new-buffer "output-buf")))
             (emacs (expand-file-name invocation-name invocation-directory))
-            (,command (format "%s -Q --batch --eval '(princ \"%s\")'"
-                              emacs ,str))
+            (,command
+             (format "%s -Q --batch --eval %s"
+                     emacs (shell-quote-argument (format "(princ %S)" ,str))))
             (inhibit-message t))
        (unwind-protect
            ;; Feature must work the same regardless how we specify the 2nd arg of `shell-command', ie,
@@ -787,7 +796,7 @@ See Bug#21722."
 
 (ert-deftest simple-tests-shell-command-39067 ()
   "The output buffer is erased or not according to `shell-command-dont-erase-buffer'."
-  (let ((str "foo\n"))
+  (let ((str "foo\\n"))
     (dolist (output-current '(t nil))
       (with-shell-command-dont-erase-buffer str output-current
         (let ((expected (cond ((eq shell-command-dont-erase-buffer 'erase) str)
@@ -799,14 +808,15 @@ See Bug#21722."
 
 (ert-deftest simple-tests-shell-command-dont-erase-buffer ()
   "The point is set at the expected position after execution of the command."
-  (let* ((str "foo\n")
+  (let* ((str "foo\\n")
          (expected-point `((beg-last-out . ,(1+ (length str)))
                            (end-last-out . ,(1+ (* 2 (length str))))
-                           (save-point . 1))))
-    (dolist (output-buffer-is-current '(t ni))
+                           (save-point . 1)
+                           (erase . ,(1+ (length str)))
+                           (nil . ,(1+ (length str))))))
+    (dolist (output-buffer-is-current '(nil))
       (with-shell-command-dont-erase-buffer str output-buffer-is-current
-        (when (memq shell-command-dont-erase-buffer '(beg-last-out end-last-out save-point))
-          (should (= (point) (alist-get shell-command-dont-erase-buffer expected-point))))))))
+        (should (= (point) (alist-get shell-command-dont-erase-buffer expected-point)))))))
 
 
 (provide 'simple-test)

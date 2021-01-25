@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990--1995, 1998--1999, 2001--2020 Free Software
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2021 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node System Interface
@@ -613,7 +613,7 @@ The elements of the @code{command-switch-alist} look like this:
 @end example
 
 The @sc{car}, @var{option}, is a string, the name of a command-line
-option (not including the initial hyphen).  The @var{handler-function}
+option (including the initial hyphen).  The @var{handler-function}
 is called to handle @var{option}, and receives the option name as its
 sole argument.
 
@@ -622,6 +622,14 @@ argument.  In these cases, the @var{handler-function} can find all the
 remaining command-line arguments in the variable
 @code{command-line-args-left} (see below).  (The entire list of
 command-line arguments is in @code{command-line-args}.)
+
+Note that the handling of @code{command-switch-alist} doesn't treat
+equals signs in @var{option} specially.  That is, if there's an option
+like @code{--name=value} on the command line, then only a
+@code{command-switch-alist} member whose @code{car} is literally
+@code{--name=value} will match this option.  If you want to parse such
+options, you need to use @code{command-line-functions} instead (see
+below).
 
 The command-line arguments are parsed by the @code{command-line-1}
 function in the @file{startup.el} file.  See also @ref{Emacs
@@ -699,6 +707,10 @@ the Emacs process.  (This is useful primarily in batch operation; see
 If @var{exit-data} is a string, its contents are stuffed into the
 terminal input buffer so that the shell (or whatever program next reads
 input) can read them.
+
+If @var{exit-data} is neither an integer nor a string, or is omitted,
+that means to use the (system-specific) exit status which indicates
+successful program termination.
 @end deffn
 
 @cindex SIGTERM
@@ -1065,12 +1077,19 @@ directories in a search path (as found in an environment variable).  Its
 value is @code{":"} for Unix and GNU systems, and @code{";"} for MS systems.
 @end defvar
 
+@defun path-separator
+This function returns the connection-local value of variable
+@code{path-separator}.  That is @code{";"} for MS systems and a local
+@code{default-directory}, and @code{":"} for Unix and GNU systems, or
+a remote @code{default-directory}.
+@end defun
+
 @defun parse-colon-path path
 This function takes a search path string such as the value of
 the @env{PATH} environment variable, and splits it at the separators,
 returning a list of directories.  @code{nil} in this list means
 the current directory.  Although the function's name says
-``colon'', it actually uses the value of @code{path-separator}.
+``colon'', it actually uses the value of variable @code{path-separator}.
 
 @example
 (parse-colon-path ":/foo:/bar")
@@ -1143,6 +1162,19 @@ in the system's terminal driver, before Emacs was started.
 @c The value is @code{nil} if Emacs is running under a window system.
 @end defvar
 
+@defvar null-device
+This variable holds the system null device.  Its value is
+@code{"/dev/null"} for Unix and GNU systems, and @code{"NUL"} for MS
+systems.
+@end defvar
+
+@defun null-device
+This function returns the connection-local value of variable
+@code{null-device}.  That is @code{"NUL"} for MS systems and a local
+@code{default-directory}, and @code{"/dev/null"} for Unix and GNU
+systems, or a remote @code{default-directory}.
+@end defun
+
 @node User Identification
 @section User Identification
 @cindex user identification
@@ -1186,7 +1218,7 @@ This function returns the full name of the logged-in user---or the value
 of the environment variable @env{NAME}, if that is set.
 
 If the Emacs process's user-id does not correspond to any known user (and
-provided @code{NAME} is not set), the result is @code{"unknown"}.
+provided @env{NAME} is not set), the result is @code{"unknown"}.
 
 If @var{uid} is non-@code{nil}, then it should be a number (a user-id)
 or a string (a login name).  Then @code{user-full-name} returns the full
@@ -1889,7 +1921,10 @@ The integer number of hours.
 The integer number of minutes.
 @item %s
 @itemx %S
-The integer number of seconds.
+The number of seconds.  If the optional @samp{,} parameter is used,
+it's a floating point number, and the number after the @samp{,}
+specifies how many decimals to be used.  @samp{%,2s} means ``use two
+decimals''.
 @item %z
 Non-printing control flag.  When it is used, other specifiers must be
 given in the order of decreasing size, i.e., years before days, hours
@@ -1981,7 +2016,7 @@ The result is @code{nil} if either argument is a NaN.
 This returns the time difference @var{t1} @minus{} @var{t2} between
 two time values, as a Lisp time value.  The result is exact and its clock
 resolution is no worse than the worse of its two arguments' resolutions.
-The result is floating-point only if it is infinite or a NaN.
+The result is floating-point only if it is infinite or a NaN@.
 If you need the difference in units
 of elapsed seconds, you can convert it with @code{time-convert} or
 @code{float-time}.  @xref{Time Conversion}.
@@ -2070,6 +2105,19 @@ unpredictable effects, since other timers (or even the same timer) can
 run while waiting.  If a timer function needs to perform an action
 after a certain time has elapsed, it can do this by scheduling a new
 timer.
+
+  If a timer function performs a remote file operation, it can be in
+conflict with an already running remote file operation of the same
+connection.  Such conflicts are detected, and they result in a
+@code{remote-file-error} error (@pxref{Standard Errors}).  This should
+be protected by wrapping the timer function body with
+
+@lisp
+@group
+(ignore-error 'remote-file-error
+  @dots{})
+@end group
+@end lisp
 
   If a timer function calls functions that can change the match data,
 it should save and restore the match data.  @xref{Saving Match Data}.
@@ -2182,9 +2230,9 @@ cause anything special to happen.
 
 @findex list-timers
 The @code{list-timers} command lists all the currently active timers.
-There's only one command available in the buffer displayed: @kbd{c}
-(@code{timer-list-cancel}) that will cancel the timer on the line
-under point.
+The command @kbd{c} (@code{timer-list-cancel}) will cancel the timer
+on the line under point.  You can sort the list by column using the
+command @kbd{S} (@code{tabulated-list-sort}).
 
 @node Idle Timers
 @section Idle Timers
@@ -2598,14 +2646,14 @@ calls @var{function} with no arguments, or @samp{--eval=@var{form}}.
 
   Any Lisp program output that would normally go to the echo area,
 either using @code{message}, or using @code{prin1}, etc., with
-@code{t} as the stream, goes instead to Emacs's standard descriptors
-when in batch mode: @code{message} writes to the standard error
-descriptor, while @code{prin1} and other print functions write to the
-standard output.  Similarly, input that would normally come from the
-minibuffer is read from the standard input descriptor.  Thus, Emacs
-behaves much like a noninteractive application program.  (The echo
-area output that Emacs itself normally generates, such as command
-echoing, is suppressed entirely.)
+@code{t} as the stream (@pxref{Output Streams}), goes instead to
+Emacs's standard descriptors when in batch mode: @code{message} writes
+to the standard error descriptor, while @code{prin1} and other print
+functions write to the standard output.  Similarly, input that would
+normally come from the minibuffer is read from the standard input
+descriptor.  Thus, Emacs behaves much like a noninteractive
+application program.  (The echo area output that Emacs itself normally
+generates, such as command echoing, is suppressed entirely.)
 
 Non-ASCII text written to the standard output or error descriptors is
 by default encoded using @code{locale-coding-system} (@pxref{Locales})
@@ -2617,7 +2665,7 @@ if it is non-@code{nil}; this can be overridden by binding
 This variable is non-@code{nil} when Emacs is running in batch mode.
 @end defvar
 
-If Emacs exits due to signalling an error in batch mode, the exit
+If Emacs exits due to signaling an error in batch mode, the exit
 status of the Emacs command is non-zero:
 
 @example
@@ -2675,9 +2723,9 @@ Emacs is restarted by the session manager.
 
 @group
 (defun save-yourself-test ()
-  (insert "(save-current-buffer
-  (switch-to-buffer \"*scratch*\")
-  (insert \"I am restored\"))")
+  (insert
+   (format "%S" '(with-current-buffer "*scratch*"
+                   (insert "I am restored"))))
   nil)
 @end group
 @end example

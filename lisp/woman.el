@@ -1,12 +1,12 @@
 ;;; woman.el --- browse UN*X manual pages `wo (without) man'
 
-;; Copyright (C) 2000-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2021 Free Software Foundation, Inc.
 
 ;; Author: Francis J. Wright <F.J.Wright@qmul.ac.uk>
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: help, unix
 ;; Adapted-By: Eli Zaretskii <eliz@gnu.org>
-;; Version: 0.551
+;; Old-Version: 0.551
 ;; URL: http://centaur.maths.qmul.ac.uk/Emacs/WoMan/
 
 ;; This file is part of GNU Emacs.
@@ -401,9 +401,9 @@
 ;;; Code:
 
 (defvar woman-version "0.551 (beta)" "WoMan version information.")
+(make-obsolete-variable 'woman-version nil "28.1")
 
 (require 'man)
-(require 'button)
 (define-button-type 'WoMan-xref-man-page
   :supertype 'Man-abstract-xref-man-page
   'func (lambda (arg)
@@ -913,8 +913,8 @@ Troff emulation is experimental and largely untested.
   :group 'faces)
 
 (defcustom woman-fontify
-  (or (and (fboundp 'display-color-p) (display-color-p))
-      (and (fboundp 'display-graphic-p) (display-graphic-p))
+  (or (display-color-p)
+      (display-graphic-p)
       (x-display-color-p))
   "If non-nil then WoMan assumes that face support is available.
 It defaults to a non-nil value if the display supports either colors
@@ -1276,14 +1276,11 @@ cache to be re-read."
 				  (test-completion
 				   word-at-point woman-topic-all-completions))
 			 word-at-point)))
-		(completing-read
-		 (if default
-		     (format "Manual entry (default %s): " default)
-		   "Manual entry: ")
-		 woman-topic-all-completions nil 1
-		 nil
-		 'woman-topic-history
-		 default))))
+		(completing-read (format-prompt "Manual entry" default)
+		                 woman-topic-all-completions nil 1
+		                 nil
+		                 'woman-topic-history
+		                 default))))
     ;; Note that completing-read always returns a string.
     (unless (= (length topic) 0)
       (cond
@@ -1830,7 +1827,6 @@ Argument EVENT is the invoking mouse event."
    ["Mini Help" woman-mini-help t]
    ,@(if (fboundp 'customize-group)
 	 '(["Customize..." (customize-group 'woman) t]))
-   ["Show Version" (message "WoMan %s" woman-version) t]
    "--"
    ("Advanced"
     ["View Source" (view-file woman-last-file-name) woman-last-file-name]
@@ -1878,7 +1874,6 @@ Argument EVENT is the invoking mouse event."
 WoMan is an ELisp emulation of much of the functionality of the Emacs
 `man' command running the standard UN*X man and ?roff programs.
 WoMan author: F.J.Wright@Maths.QMW.ac.uk
-WoMan version: see `woman-version'.
 See `Man-mode' for additional details.
 \\{woman-mode-map}"
   (let ((Man-build-page-list (symbol-function 'Man-build-page-list))
@@ -2292,6 +2287,12 @@ Currently set only from \\='\\\" t in the first line of the source file.")
     ;; Set buffer-local variables:
     (setq fill-column woman-fill-column
 	  tab-width woman-tab-width)
+
+    ;; Ignore the \, and \/ kerning operators.  See
+    ;; https://www.gnu.org/software/groff/manual/groff.html#Ligatures-and-Kerning
+    (goto-char (point-min))
+    (while (re-search-forward "\\\\[,/]" nil t)
+      (replace-match "" t t))
 
     ;; Hide unpaddable and digit-width spaces \(space) and \0:
     (goto-char from)

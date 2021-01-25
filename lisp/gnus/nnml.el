@@ -1,6 +1,6 @@
 ;;; nnml.el --- mail spool access for Gnus
 
-;; Copyright (C) 1995-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1995-2021 Free Software Foundation, Inc.
 
 ;; Authors: Didier Verna <didier@didierverna.net> (adding compaction)
 ;;	Simon Josefsson <simon@josefsson.org>
@@ -766,10 +766,26 @@ article number.  This function is called narrowed to an article."
 	 (if (re-search-forward "\n\r?\n" nil t)
 	     (1- (point))
 	   (point-max))))
-      (let ((headers (nnheader-parse-naked-head)))
+      (let ((headers (nnheader-parse-head t)))
 	(setf (mail-header-chars  headers) chars)
 	(setf (mail-header-number headers) number)
+	;; If there's non-ASCII raw characters in the data,
+	;; RFC2047-encode them to avoid having arbitrary data in the
+	;; .overview file.
+	(nnml--encode-headers headers)
 	headers))))
+
+(defun nnml--encode-headers (headers)
+  (let ((subject (mail-header-subject headers))
+	(rfc2047-encoding-type 'mime))
+    (unless (string-match "\\`[[:ascii:]]*\\'" subject)
+      (setf (mail-header-subject headers)
+	    (mail-encode-encoded-word-string subject t))))
+  (let ((from (mail-header-from headers))
+	(rfc2047-encoding-type 'address-mime))
+    (unless (string-match "\\`[[:ascii:]]*\\'" from)
+      (setf (mail-header-from headers)
+	    (rfc2047-encode-string from t)))))
 
 (defun nnml-get-nov-buffer (group &optional incrementalp)
   (let ((buffer (gnus-get-buffer-create
@@ -778,8 +794,8 @@ article number.  This function is called narrowed to an article."
 			 group)))
 	 (file-name-coding-system nnmail-pathname-coding-system))
     (with-current-buffer buffer
-      (set (make-local-variable 'nnml-nov-buffer-file-name)
-	   (nnmail-group-pathname group nnml-directory nnml-nov-file-name))
+      (setq-local nnml-nov-buffer-file-name
+                  (nnmail-group-pathname group nnml-directory nnml-nov-file-name))
       (erase-buffer)
       (when (and (not incrementalp)
 		 (file-exists-p nnml-nov-buffer-file-name))

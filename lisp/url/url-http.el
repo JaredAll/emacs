@@ -1,6 +1,6 @@
 ;;; url-http.el --- HTTP retrieval routines  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1999, 2001, 2004-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1999, 2001, 2004-2021 Free Software Foundation, Inc.
 
 ;; Author: Bill Perry <wmperry@gnu.org>
 ;; Maintainer: emacs-devel@gnu.org
@@ -225,7 +225,7 @@ request.")
         (os-info (unless (and (listp url-privacy-level)
                               (memq 'os url-privacy-level))
                    (format "(%s; %s)" url-system-type url-os-type)))
-        (url-info (format "URL/%s" url-version)))
+        (url-info (format "URL/Emacs")))
     (string-join (delq nil (list package-info url-info
                                  emacs-info os-info))
                  " ")))
@@ -702,15 +702,7 @@ should be shown to the user."
 	    ;; Treat everything like '300'
 	    nil))
 	 (when redirect-uri
-	   ;; Clean off any whitespace and/or <...> cruft.
-	   (if (string-match "\\([^ \t]+\\)[ \t]" redirect-uri)
-	       (setq redirect-uri (match-string 1 redirect-uri)))
-	   (if (string-match "^<\\(.*\\)>$" redirect-uri)
-	       (setq redirect-uri (match-string 1 redirect-uri)))
-
-	   ;; Some stupid sites (like sourceforge) send a
-	   ;; non-fully-qualified URL (ie: /), which royally confuses
-	   ;; the URL library.
+	   ;; Handle relative redirect URIs.
 	   (if (not (string-match url-nonrelative-link redirect-uri))
                ;; Be careful to use the real target URL, otherwise we may
                ;; compute the redirection relative to the URL of the proxy.
@@ -749,12 +741,12 @@ should be shown to the user."
 		   ;; without changing the API.  Instead url-retrieve should
 		   ;; either simply not return the "destination" buffer, or it
 		   ;; should take an optional `dest-buf' argument.
-		   (set (make-local-variable 'url-redirect-buffer)
-			(url-retrieve-internal
-			 redirect-uri url-callback-function
-			 url-callback-arguments
-			 (url-silent url-current-object)
-			 (not (url-use-cookies url-current-object))))
+                   (setq-local url-redirect-buffer
+                               (url-retrieve-internal
+                                redirect-uri url-callback-function
+                                url-callback-arguments
+                                (url-silent url-current-object)
+                                (not (url-use-cookies url-current-object))))
 		   (url-mark-buffer-as-dead buffer))
 	       ;; We hit url-max-redirections, so issue an error and
 	       ;; stop redirecting.
@@ -1127,9 +1119,7 @@ the end of the document."
               (beginning-of-line)
               (looking-at regexp))
  	    (add-text-properties (match-beginning 0) (match-end 0)
-				 (list 'start-open t
-				       'end-open t
-				       'chunked-encoding t
+                                 (list 'chunked-encoding t
 				       'face 'cursor
 				       'invisible t))
 	    (setq url-http-chunked-length (string-to-number (buffer-substring
@@ -1404,13 +1394,22 @@ The return value of this function is the retrieval buffer."
 
 (defun url-https-proxy-connect (connection)
   (setq url-http-after-change-function 'url-https-proxy-after-change-function)
-  (process-send-string connection (format (concat "CONNECT %s:%d HTTP/1.1\r\n"
-                                                  "Host: %s\r\n"
-                                                  "\r\n")
-                                          (url-host url-current-object)
-                                          (or (url-port url-current-object)
-                                              url-https-default-port)
-                                          (url-host url-current-object))))
+  (process-send-string
+   connection
+   (format
+    (concat "CONNECT %s:%d HTTP/1.1\r\n"
+            "Host: %s\r\n"
+            (let ((proxy-auth (let ((url-basic-auth-storage
+                                     'url-http-proxy-basic-auth-storage))
+                                (url-get-authentication url-http-proxy nil
+                                                        'any nil))))
+              (and proxy-auth
+                   (concat "Proxy-Authorization: " proxy-auth "\r\n")))
+            "\r\n")
+    (url-host url-current-object)
+    (or (url-port url-current-object)
+        url-https-default-port)
+    (url-host url-current-object))))
 
 (defun url-https-proxy-after-change-function (_st _nd _length)
   (let* ((process-buffer (current-buffer))

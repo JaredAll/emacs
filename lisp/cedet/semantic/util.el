@@ -1,6 +1,6 @@
 ;;; semantic/util.el --- Utilities for use with semantic tag tables
 
-;;; Copyright (C) 1999-2005, 2007-2020 Free Software Foundation, Inc.
+;;; Copyright (C) 1999-2005, 2007-2021 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: syntax
@@ -79,9 +79,6 @@ If FILE is not loaded, and semanticdb is not available, find the file
 	(with-current-buffer (find-file-noselect file)
 	  (semantic-fetch-tags))))))
 
-(semantic-alias-obsolete 'semantic-file-token-stream
-			 'semantic-file-tag-table "23.2")
-
 (declare-function semanticdb-abstract-table-child-p "semantic/db" (obj) t)
 (declare-function semanticdb-refresh-table "semantic/db")
 (declare-function semanticdb-get-tags "semantic/db" (arg &rest args) t)
@@ -136,9 +133,6 @@ buffer, or a filename.  If SOMETHING is nil return nil."
 ;;    (semantic-fetch-tags))
    ;; don't know what it is
    (t nil)))
-
-(semantic-alias-obsolete 'semantic-something-to-stream
-			 'semantic-something-to-tag-table "23.2")
 
 ;;; Completion APIs
 ;;
@@ -307,7 +301,6 @@ If TAG is not specified, use the tag at point."
 		      semantic-init-db-hook
 		      semantic-unmatched-syntax-hook
 		      semantic--before-fetch-tags-hook
-		      semantic-after-toplevel-bovinate-hook
 		      semantic-after-toplevel-cache-change-hook
 		      semantic-before-toplevel-cache-flush-hook
 		      semantic-dump-parse

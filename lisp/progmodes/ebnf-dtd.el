@@ -1,6 +1,6 @@
 ;;; ebnf-dtd.el --- parser for DTD (Data Type Description for XML)
 
-;; Copyright (C) 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2021 Free Software Foundation, Inc.
 
 ;; Author: Vinicius Jose Latorre <viniciusjl.gnu@gmail.com>
 ;; Keywords: wp, ebnf, PostScript
@@ -38,11 +38,11 @@
 ;; ----------
 ;;
 ;;	See the URLs:
-;;	`http://www.w3.org/TR/2004/REC-xml-20040204/'
+;;	`https://www.w3.org/TR/2004/REC-xml-20040204/'
 ;;	(Extensible Markup Language (XML) 1.0 (Third Edition))
-;;	`http://www.w3.org/TR/html40/'
+;;	`https://www.w3.org/TR/html40/'
 ;;	(HTML 4.01 Specification)
-;;	`http://www.w3.org/TR/NOTE-html-970421'
+;;	`https://www.w3.org/TR/NOTE-html-970421'
 ;;	(HTML DTD with support for Style Sheets)
 ;;
 ;;

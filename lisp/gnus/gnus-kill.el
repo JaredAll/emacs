@@ -1,6 +1,6 @@
 ;;; gnus-kill.el --- kill commands for Gnus
 
-;; Copyright (C) 1995-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1995-2021 Free Software Foundation, Inc.
 
 ;; Author: Masanobu UMEDA <umerin@flab.flab.fujitsu.junet>
 ;;	Lars Magne Ingebrigtsen <larsi@gnus.org>
@@ -653,7 +653,7 @@ Usage: emacs -batch -l ~/.emacs -l gnus -f gnus-batch-score"
 	 gnus-options-not-subscribe)
     ;; Eat all arguments.
     (setq command-line-args-left nil)
-    (gnus-slave)
+    (gnus-child)
     ;; Apply kills to specified newsgroups in command line arguments.
     (setq newsrc (cdr gnus-newsrc-alist))
     (while (setq info (pop newsrc))

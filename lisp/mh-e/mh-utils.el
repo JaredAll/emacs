@@ -1,6 +1,6 @@
 ;;; mh-utils.el --- MH-E general utilities
 
-;; Copyright (C) 1993, 1995, 1997, 2000-2020 Free Software Foundation,
+;; Copyright (C) 1993, 1995, 1997, 2000-2021 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Bill Wohler <wohler@newt.com>
@@ -270,9 +270,8 @@ and displayed in a help buffer."
                   (cdr (assoc nil (assoc major-mode mh-help-messages)))))
          (text (substitute-command-keys (mapconcat 'identity help ""))))
     (with-electric-help
-     (function
-      (lambda ()
-        (insert text)))
+     (lambda ()
+       (insert text))
      mh-help-buffer)))
 
 ;;;###mh-autoload

@@ -1,4 +1,4 @@
-;;; cham.el --- support for Cham -*- coding: utf-8 -*-
+;;; cham.el --- support for Cham -*- coding: utf-8; lexical-binding: t -*-
 
 ;; Copyright (C) 2008, 2009, 2010, 2011, 2012
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -34,6 +34,12 @@
 (set-language-info-alist
  "Cham" '((charset unicode)
 	      (coding-system utf-8)
-	      (coding-priority utf-8)))
+	      (coding-priority utf-8)
+              (input-method . "cham")
+              (sample-text . "Cham (ꨌꩌ)\tꨦꨤꩌ ꨦꨁꨰ")
+              (documentation . "\
+The Cham script is a Brahmic script used to write Cham,
+an Austronesian language spoken by some 245,000 Chams
+in Vietnam and Cambodia.")))
 
 (provide 'cham)

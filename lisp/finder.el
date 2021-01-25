@@ -1,6 +1,6 @@
 ;;; finder.el --- topic & keyword-based code finder
 
-;; Copyright (C) 1992, 1997-1999, 2001-2020 Free Software Foundation,
+;; Copyright (C) 1992, 1997-1999, 2001-2021 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Eric S. Raymond <esr@snark.thyrsus.com>
@@ -178,6 +178,9 @@ directory name and PACKAGE is the name of a package (a symbol).
 When generating `package--builtins', Emacs assumes any file in
 DIR is part of the package PACKAGE.")
 
+(defconst finder-buffer "*Finder*"
+  "Name of the Finder buffer.")
+
 (defun finder-compile-keywords (&rest dirs)
   "Regenerate list of built-in Emacs packages.
 This recomputes `package--builtins' and `finder-keywords-hash',
@@ -188,7 +191,7 @@ from; the default is `load-path'."
   ;; Allow compressed files also.
   (setq package--builtins nil)
   (setq finder-keywords-hash (make-hash-table :test 'eq))
-  (let* ((el-file-regexp "^\\([^=].*\\)\\.el\\(\\.\\(gz\\|Z\\)\\)?$")
+  (let* ((el-file-regexp "\\`\\([^=].*\\)\\.el\\(\\.\\(gz\\|Z\\)\\)?\\'")
          (file-count 0)
          (files (cl-loop for d in (or dirs load-path)
                          when (file-exists-p (directory-file-name d))
@@ -197,7 +200,7 @@ from; the default is `load-path'."
                                    (cons d f))
                                  (directory-files d nil el-file-regexp))))
          (progress (make-progress-reporter
-                    (byte-compile-info-string "Scanning files for finder")
+                    (byte-compile-info "Scanning files for finder")
                     0 (length files)))
 	 package-override base-name ; processed
 	 summary keywords package version entry desc)
@@ -338,9 +341,9 @@ not `finder-known-keywords'."
 (defun finder-list-keywords ()
   "Display descriptions of the keywords in the Finder buffer."
   (interactive)
-  (if (get-buffer "*Finder*")
-      (pop-to-buffer "*Finder*")
-    (pop-to-buffer (get-buffer-create "*Finder*"))
+  (if (get-buffer finder-buffer)
+      (pop-to-buffer finder-buffer)
+    (pop-to-buffer (get-buffer-create finder-buffer))
     (finder-mode)
     (let ((inhibit-read-only t))
       (erase-buffer)
@@ -445,7 +448,7 @@ FILE should be in a form suitable for passing to `locate-library'."
   :syntax-table finder-mode-syntax-table
   (setq buffer-read-only t
 	buffer-undo-list t)
-  (set (make-local-variable 'finder-headmark) nil))
+  (setq-local finder-headmark nil))
 
 (defun finder-summary ()
   "Summarize basic Finder commands."
@@ -460,10 +463,9 @@ finder directory, \\[finder-exit] = quit, \\[finder-summary] = help")))
   "Exit Finder mode.
 Quit the window and kill all Finder-related buffers."
   (interactive)
-  (let ((buf "*Finder*"))
-    (if (equal (current-buffer) buf)
-        (quit-window t)
-      (and (get-buffer buf) (kill-buffer buf)))))
+  (quit-window t)
+  (dolist (buf (list finder-buffer "*Finder-package*"))
+    (and (get-buffer buf) (kill-buffer buf))))
 
 (defun finder-unload-function ()
   "Unload the Finder library."

@@ -1,6 +1,6 @@
 ;;; semantic/ede-grammar.el --- EDE support for Semantic Grammar Files
 
-;; Copyright (C) 2003-2004, 2007-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2003-2004, 2007-2021 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: project, make
@@ -142,19 +142,10 @@ Lays claim to all -by.el, and -wy.el files."
 				   (match-string 1 package)))
 		     (src (ede-expand-filename obj fname))
 		     (csrc (concat (file-name-sans-extension src) ".elc")))
-		(if (< emacs-major-version 24)
-		    ;; Does not have `byte-recompile-file'
-		    (if (or (not (file-exists-p csrc))
-			    (file-newer-than-file-p src csrc))
-			(progn
-			  (setq comp (1+ comp))
-			  (byte-compile-file src))
-		      (setq utd (1+ utd)))
-		  ;; Emacs 24 and newer
-		  (with-no-warnings
-		    (if (eq (byte-recompile-file src nil 0) t)
-			(setq comp (1+ comp))
-		      (setq utd (1+ utd))))))))
+                (with-no-warnings
+                  (if (eq (byte-recompile-file src nil 0) t)
+                      (setq comp (1+ comp))
+                    (setq utd (1+ utd)))))))
 	  (oref obj source))
     (message "All Semantic Grammar sources are up to date in %s" (eieio-object-name obj))
     (cons comp utd)))

@@ -1,6 +1,6 @@
 ;;; idlw-toolbar.el --- a debugging toolbar for IDLWAVE
 
-;; Copyright (C) 1999-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2021 Free Software Foundation, Inc.
 
 ;; Author: Carsten Dominik <dominik@astro.uva.nl>
 ;; Maintainer: emacs-devel@gnu.org
@@ -29,7 +29,7 @@
 
 ;; New versions of IDLWAVE, documentation, and more information
 ;; available from:
-;;                 http://github.com/jdtsmith/idlwave
+;;                 https://github.com/jdtsmith/idlwave
 
 
 ;;; Code:

@@ -1,6 +1,6 @@
 ;;; url.el --- Uniform Resource Locator retrieval tool  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1996-1999, 2001, 2004-2020 Free Software Foundation,
+;; Copyright (C) 1996-1999, 2001, 2004-2021 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Bill Perry <wmperry@gnu.org>
@@ -24,7 +24,7 @@
 
 ;;; Commentary:
 
-;; Registered URI schemes: http://www.iana.org/assignments/uri-schemes
+;; Registered URI schemes: https://www.iana.org/assignments/uri-schemes
 
 ;;; Code:
 
@@ -238,7 +238,8 @@ how long to wait for a response before giving up."
   (let ((retrieval-done nil)
 	(start-time (current-time))
         (url-asynchronous nil)
-        (asynch-buffer nil))
+        (asynch-buffer nil)
+        (timed-out nil))
     (setq asynch-buffer
 	  (url-retrieve url (lambda (&rest ignored)
 			      (url-debug 'retrieval "Synchronous fetching done (%S)" (current-buffer))
@@ -261,7 +262,9 @@ how long to wait for a response before giving up."
 	;; process output.
 	(while (and (not retrieval-done)
                     (or (not timeout)
-			(time-less-p (time-since start-time) timeout)))
+			(not (setq timed-out
+                                   (time-less-p timeout
+                                                (time-since start-time))))))
 	  (url-debug 'retrieval
 		     "Spinning in url-retrieve-synchronously: %S (%S)"
 		     retrieval-done asynch-buffer)
@@ -300,8 +303,16 @@ how long to wait for a response before giving up."
 	      (when quit-flag
 		(delete-process proc))
               (setq proc (and (not quit-flag)
-			      (get-buffer-process asynch-buffer)))))))
-      asynch-buffer)))
+			      (get-buffer-process asynch-buffer))))))
+        ;; On timeouts, make sure we kill any pending processes.
+        ;; There may be more than one if we had a redirect.
+        (when timed-out
+          (when (process-live-p proc)
+            (delete-process proc))
+          (when-let ((aproc (get-buffer-process asynch-buffer)))
+            (when (process-live-p aproc)
+              (delete-process aproc))))))
+    asynch-buffer))
 
 ;; url-mm-callback called from url-mm, which requires mm-decode.
 (declare-function mm-dissect-buffer "mm-decode"
@@ -354,19 +365,7 @@ how long to wait for a response before giving up."
       (if (buffer-live-p buff)
 	  (kill-buffer buff)))))
 
-(cond
- ((fboundp 'display-warning)
-  (defalias 'url-warn 'display-warning))
- ((fboundp 'warn)
-  (defun url-warn (class message &optional level)
-    (warn "(%s/%s) %s" class (or level 'warning) message)))
- (t
-  (defun url-warn (class message &optional level)
-    (with-current-buffer (get-buffer-create "*URL-WARNINGS*")
-      (goto-char (point-max))
-      (save-excursion
-	(insert (format "(%s/%s) %s\n" class (or level 'warning) message)))
-      (display-buffer (current-buffer))))))
+(define-obsolete-function-alias 'url-warn #'display-warning "28.1")
 
 (provide 'url)
 

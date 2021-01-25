@@ -1,9 +1,9 @@
 ;;; erc-stamp.el --- Timestamping for ERC messages  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2002-2004, 2006-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2004, 2006-2021 Free Software Foundation, Inc.
 
 ;; Author: Mario Lang <mlang@delysid.org>
-;; Maintainer: Amin Bandali <mab@gnu.org>
+;; Maintainer: Amin Bandali <bandali@gnu.org>
 ;; Keywords: comm, processes, timestamp
 ;; URL: https://www.emacswiki.org/emacs/ErcStamp
 
@@ -35,7 +35,6 @@
 ;;; Code:
 
 (require 'erc)
-(require 'erc-compat)
 
 (defgroup erc-stamp nil
   "For long conversation on IRC it is sometimes quite

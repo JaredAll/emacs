@@ -1,6 +1,6 @@
 ;;; tramp-compat.el --- Tramp compatibility functions  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2007-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2021 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
@@ -43,6 +43,16 @@
 
 ;; `temporary-file-directory' as function is introduced with Emacs 26.1.
 (declare-function tramp-handle-temporary-file-directory "tramp")
+(declare-function tramp-tramp-file-p "tramp")
+(defvar tramp-temp-name-prefix)
+
+(defconst tramp-compat-emacs-compiled-version (eval-when-compile emacs-version)
+  "The Emacs version used for compilation.")
+
+(unless (= emacs-major-version
+	   (car (version-to-list tramp-compat-emacs-compiled-version)))
+  (warn "Tramp has been compiled with Emacs %s, this is Emacs %s"
+	tramp-compat-emacs-compiled-version emacs-version))
 
 ;; For not existing functions, obsolete functions, or functions with a
 ;; changed argument list, there are compiler warnings.  We want to
@@ -61,15 +71,19 @@ It is the default value of `temporary-file-directory'."
   ;; into an infloop.
   (eval (car (get 'temporary-file-directory 'standard-value))))
 
+(defsubst tramp-compat-make-temp-name ()
+  "Generate a local temporary file name (compat function)."
+  (make-temp-name
+   (expand-file-name
+    tramp-temp-name-prefix (tramp-compat-temporary-file-directory))))
+
 (defsubst tramp-compat-make-temp-file (f &optional dir-flag)
   "Create a local temporary file (compat function).
 Add the extension of F, if existing."
-  (let* (file-name-handler-alist
-	 (prefix (expand-file-name
-		  (symbol-value 'tramp-temp-name-prefix)
-		  (tramp-compat-temporary-file-directory)))
-	 (extension (file-name-extension f t)))
-    (make-temp-file prefix dir-flag extension)))
+  (make-temp-file
+   (expand-file-name
+    tramp-temp-name-prefix (tramp-compat-temporary-file-directory))
+   dir-flag (file-name-extension f t)))
 
 ;; `temporary-file-directory' as function is introduced with Emacs 26.1.
 (defalias 'tramp-compat-temporary-file-directory-function
@@ -296,6 +310,44 @@ A nil value for either argument stands for the current time."
     (lambda (filename &optional timestamp _flag)
       (set-file-times filename timestamp))))
 
+;; `directory-files' and `directory-files-and-attributes' got argument
+;; COUNT in Emacs 28.1.
+(defalias 'tramp-compat-directory-files
+  (if (equal (tramp-compat-funcall 'func-arity #'directory-files) '(1 . 5))
+      #'directory-files
+    (lambda (directory &optional full match nosort _count)
+      (directory-files directory full match nosort))))
+
+(defalias 'tramp-compat-directory-files-and-attributes
+  (if (equal (tramp-compat-funcall 'func-arity #'directory-files-and-attributes)
+	     '(1 . 6))
+      #'directory-files-and-attributes
+    (lambda (directory &optional full match nosort id-format _count)
+      (directory-files-and-attributes directory full match nosort id-format))))
+
+;; `directory-empty-p' is new in Emacs 28.1.
+(defalias 'tramp-compat-directory-empty-p
+  (if (fboundp 'directory-empty-p)
+      #'directory-empty-p
+    (lambda (dir)
+      (and (file-directory-p dir)
+	   (null (tramp-compat-directory-files
+		  dir nil directory-files-no-dot-files-regexp t 1))))))
+
+;; Function `null-device' is new in Emacs 28.1.
+(defalias 'tramp-compat-null-device
+  (if (fboundp 'null-device)
+      #'null-device
+    (lambda ()
+      (if (tramp-tramp-file-p default-directory) "/dev/null" null-device))))
+
+;; Function `string-replace' is new in Emacs 28.1.
+(defalias 'tramp-compat-string-replace
+  (if (fboundp 'string-replace)
+      #'string-replace
+    (lambda (fromstring tostring instring)
+      (replace-regexp-in-string (regexp-quote fromstring) tostring instring))))
+
 (add-hook 'tramp-unload-hook
 	  (lambda ()
 	    (unload-feature 'tramp-loaddefs 'force)
@@ -309,5 +361,8 @@ A nil value for either argument stands for the current time."
 ;;
 ;; * Starting with Emacs 27.1, there's no need to escape open
 ;;   parentheses with a backslash in docstrings anymore.
+;;
+;; * Starting with Emacs 27.1, there's `make-empty-file'.  Could be
+;;   used instead of `write-region'.
 
 ;;; tramp-compat.el ends here

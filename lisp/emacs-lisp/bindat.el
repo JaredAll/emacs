@@ -1,6 +1,6 @@
 ;;; bindat.el --- binary data structure packing and unpacking.
 
-;; Copyright (C) 2002-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2021 Free Software Foundation, Inc.
 
 ;; Author: Kim F. Storm <storm@cua.dk>
 ;; Assignment name: struct.el
@@ -298,7 +298,7 @@
 		  type field
 		  field nil))
 	(if (and (consp len) (not (eq type 'eval)))
-	    (setq len (apply 'bindat-get-field struct len)))
+            (setq len (apply #'bindat-get-field struct len)))
 	(if (not len)
 	    (setq len 1))
 	(cond
@@ -557,7 +557,7 @@ e.g. corresponding to STRUCT.FIELD1[INDEX2].FIELD3..."
 		  type field
 		  field nil))
 	(if (and (consp len) (not (eq type 'eval)))
-	    (setq len (apply 'bindat-get-field struct len)))
+            (setq len (apply #'bindat-get-field struct len)))
 	(if (not len)
 	    (setq len 1))
 	(cond
@@ -624,7 +624,7 @@ only that many elements from VECT."
     (while (> i 0)
       (setq i (1- i)
 	    s (cons (format (if (= i 0) fmt fmt2) (aref vect i)) s)))
-    (apply 'concat s)))
+    (apply #'concat s)))
 
 (defun bindat-vector-to-dec (vect &optional sep)
   "Format vector VECT in decimal format separated by dots.
@@ -632,7 +632,7 @@ If optional second arg SEP is a string, use that as separator."
   (bindat-format-vector vect "%d" (if (stringp sep) sep ".")))
 
 (defun bindat-vector-to-hex (vect &optional sep)
-  "Format vector VECT in hex format separated by dots.
+  "Format vector VECT in hex format separated by colons.
 If optional second arg SEP is a string, use that as separator."
   (bindat-format-vector vect "%02x" (if (stringp sep) sep ":")))
 

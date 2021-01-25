@@ -1,6 +1,6 @@
 ;;; sort.el --- commands to sort text in an Emacs buffer -*- lexical-binding: t -*-
 
-;; Copyright (C) 1986-1987, 1994-1995, 2001-2020 Free Software
+;; Copyright (C) 1986-1987, 1994-1995, 2001-2021 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Howie Kaye
@@ -198,7 +198,8 @@ as start and end positions), and with `string<' otherwise."
 
 ;;;###autoload
 (defun sort-lines (reverse beg end)
-  "Sort lines in region alphabetically; argument means descending order.
+  "Sort lines in region alphabetically; REVERSE non-nil means descending order.
+Interactively, REVERSE is the prefix argument, and BEG and END are the region.
 Called from a program, there are three arguments:
 REVERSE (non-nil means reverse order), BEG and END (region to sort).
 The variable `sort-fold-case' determines whether alphabetic case affects
@@ -250,7 +251,7 @@ the sort order."
       (narrow-to-region beg end)
       (goto-char (point-min))
       (sort-subr reverse
-		 (function (lambda () (skip-chars-forward "\n")))
+                 (lambda () (skip-chars-forward "\n"))
 		 'forward-page))))
 
 (defvar sort-fields-syntax-table nil)
@@ -315,16 +316,16 @@ FIELD, BEG and END.  BEG and END specify region to sort."
 ;;region to sort."
 ;;  (interactive "p\nr")
 ;;  (sort-fields-1 field beg end
-;;		 (function (lambda ()
-;;			     (sort-skip-fields field)
-;;			     (string-to-number
-;;			      (buffer-substring
-;;			       (point)
-;;			       (save-excursion
-;;				 (re-search-forward
-;;				  "[+-]?[0-9]*\\.?[0-9]*\\([eE][+-]?[0-9]+\\)?")
-;;				 (point))))))
-;;		 nil))
+;; 		 (lambda ()
+;; 		   (sort-skip-fields field)
+;; 		   (string-to-number
+;; 		    (buffer-substring
+;; 		     (point)
+;; 		     (save-excursion
+;; 		       (re-search-forward
+;; 			"[+-]?[0-9]*\\.?[0-9]*\\([eE][+-]?[0-9]+\\)?")
+;; 		       (point)))))
+;; 		 nil))
 
 ;;;###autoload
 (defun sort-fields (field beg end)
@@ -339,10 +340,10 @@ the sort order."
   (let ;; To make `end-of-line' and etc. to ignore fields.
       ((inhibit-field-text-motion t))
     (sort-fields-1 field beg end
-		   (function (lambda ()
-			       (sort-skip-fields field)
-			       nil))
-		   (function (lambda () (skip-chars-forward "^ \t\n"))))))
+                   (lambda ()
+                     (sort-skip-fields field)
+                     nil)
+                   (lambda () (skip-chars-forward "^ \t\n")))))
 
 (defun sort-fields-1 (field beg end startkeyfun endkeyfun)
   (let ((tbl (syntax-table)))
@@ -456,21 +457,21 @@ sRegexp specifying key within record: \nr")
 	(goto-char (match-beginning 0))
 	(sort-subr reverse
 		   'sort-regexp-fields-next-record
-		   (function (lambda ()
-			       (goto-char sort-regexp-record-end)))
-		   (function (lambda ()
-			       (let ((n 0))
-				 (cond ((numberp key-regexp)
-					(setq n key-regexp))
-				       ((re-search-forward
-					  key-regexp sort-regexp-record-end t)
-					(setq n 0))
-				       (t (throw 'key nil)))
-				 (condition-case ()
-				     (cons (match-beginning n)
-					   (match-end n))
-				   ;; if there was no such register
-				   (error (throw 'key nil)))))))))))
+                   (lambda ()
+                     (goto-char sort-regexp-record-end))
+                   (lambda ()
+                     (let ((n 0))
+                       (cond ((numberp key-regexp)
+                              (setq n key-regexp))
+                             ((re-search-forward
+                               key-regexp sort-regexp-record-end t)
+                              (setq n 0))
+                             (t (throw 'key nil)))
+                       (condition-case ()
+                           (cons (match-beginning n)
+                                 (match-end n))
+                         ;; if there was no such register
+                         (error (throw 'key nil))))))))))
 
 
 (defvar sort-columns-subprocess t)
@@ -553,9 +554,6 @@ is the one that ends before END."
   (if (> beg end)
       (let (mid) (setq mid end end beg beg mid)))
   (save-excursion
-    (when (or (< (line-beginning-position) beg)
-              (< end (line-end-position)))
-      (user-error "There are no full lines in the region"))
     ;; Put beg at the start of a line and end and the end of one --
     ;; the largest possible region which fits this criteria.
     (goto-char beg)
@@ -567,6 +565,8 @@ is the one that ends before END."
     ;; reversal; it isn't difficult to add it afterward.
     (or (and (eolp) (not (bolp))) (progn (forward-line -1) (end-of-line)))
     (setq end (point-marker))
+    (when (<= end beg)
+      (user-error "There are no full lines in the region"))
     ;; The real work.  This thing cranks through memory on large regions.
     (let (ll (do t))
       (while do

@@ -1,6 +1,6 @@
 ;;; vc-arch.el --- VC backend for the Arch version-control system  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2004-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2021 Free Software Foundation, Inc.
 
 ;; Author:      FSF (see vc.el for full credits)
 ;; Maintainer:  Stefan Monnier <monnier@gnu.org>
@@ -597,18 +597,21 @@ CALLBACK expects (ENTRIES &optional MORE-TO-COME); see
     (unless (file-writable-p rl-dir)
       (error "No writable revlib directory found"))
     (message "Revlib at %s" rl-dir)
-    (let* ((archives (directory-files rl-dir 'full "[^.]\\|..."))
+    (let* ((archives (directory-files rl-dir 'full
+                                      directory-files-no-dot-files-regexp))
            (categories
             (apply 'append
                    (mapcar (lambda (dir)
                              (when (file-directory-p dir)
-                               (directory-files dir 'full "[^.]\\|...")))
+                               (directory-files
+                                dir 'full directory-files-no-dot-files-regexp)))
                            archives)))
            (branches
             (apply 'append
                    (mapcar (lambda (dir)
                              (when (file-directory-p dir)
-                               (directory-files dir 'full "[^.]\\|...")))
+                               (directory-files
+                                dir 'full directory-files-no-dot-files-regexp)))
                            categories)))
            (versions
             (apply 'append

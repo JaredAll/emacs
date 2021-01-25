@@ -1,29 +1,32 @@
 ;;; lread-tests.el --- tests for lread.c -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2016-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2016-2021 Free Software Foundation, Inc.
 
 ;; Author: Philipp Stephani <phst@google.com>
 
 ;; This file is part of GNU Emacs.
 
-;; This program is free software; you can redistribute it and/or modify
+;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; This program is distributed in the hope that it will be useful,
+;; GNU Emacs is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
 ;; Unit tests for code in src/lread.c.
 
 ;;; Code:
+
+(require 'ert)
+(require 'ert-x)
 
 (ert-deftest lread-char-number ()
   (should (equal (read "?\\N{U+A817}") #xA817)))
@@ -146,10 +149,7 @@ literals (Bug#20852)."
 
 (ert-deftest lread-test-bug26837 ()
   "Test for https://debbugs.gnu.org/26837 ."
-  (let ((load-path (cons
-                    (file-name-as-directory
-                     (expand-file-name "data" (getenv "EMACS_TEST_DIRECTORY")))
-                    load-path)))
+  (let ((load-path (cons (ert-resource-directory) load-path)))
     (load "somelib" nil t)
     (should (string-suffix-p "/somelib.el" (caar load-history)))
     (load "somelib2" nil t)
@@ -189,5 +189,11 @@ literals (Bug#20852)."
 
 (ert-deftest lread-circular-hash ()
   (should-error (read "#s(hash-table data #0=(#0# . #0#))")))
+
+(ert-deftest test-inhibit-interaction ()
+  (let ((inhibit-interaction t))
+    (should-error (read-char "foo: "))
+    (should-error (read-event "foo: "))
+    (should-error (read-char-exclusive "foo: "))))
 
 ;;; lread-tests.el ends here

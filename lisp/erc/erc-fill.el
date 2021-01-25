@@ -1,10 +1,10 @@
 ;;; erc-fill.el --- Filling IRC messages in various ways
 
-;; Copyright (C) 2001-2004, 2006-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2004, 2006-2021 Free Software Foundation, Inc.
 
 ;; Author: Andreas Fuchs <asf@void.at>
 ;;         Mario Lang <mlang@delysid.org>
-;; Maintainer: Amin Bandali <mab@gnu.org>
+;; Maintainer: Amin Bandali <bandali@gnu.org>
 ;; URL: https://www.emacswiki.org/emacs/ErcFilling
 
 ;; This file is part of GNU Emacs.
@@ -38,7 +38,7 @@
   :group 'erc)
 
 ;;;###autoload(autoload 'erc-fill-mode "erc-fill" nil t)
-(erc-define-minor-mode erc-fill-mode
+(define-minor-mode erc-fill-mode
   "Toggle ERC fill mode.
 With a prefix argument ARG, enable ERC fill mode if ARG is
 positive, and disable it otherwise.  If called from Lisp, enable

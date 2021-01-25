@@ -1,6 +1,6 @@
 ;;; gnus-srvr.el --- virtual server support for Gnus
 
-;; Copyright (C) 1995-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1995-2021 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -34,7 +34,7 @@
 (require 'gnus-range)
 (require 'gnus-cloud)
 
-(autoload 'gnus-group-make-nnir-group "nnir")
+(autoload 'gnus-group-read-ephemeral-search-group "nnselect")
 
 (defcustom gnus-server-exit-hook nil
   "Hook run when exiting the server buffer."
@@ -176,7 +176,7 @@ If nil, a faster, but more primitive, buffer is used instead."
 
     "g" gnus-server-regenerate-server
 
-    "G" gnus-group-make-nnir-group
+    "G" gnus-group-read-ephemeral-search-group
 
     "z" gnus-server-compact-server
 
@@ -262,8 +262,7 @@ The following commands are available:
   (setq mode-line-process nil)
   (buffer-disable-undo)
   (setq truncate-lines t)
-  (set (make-local-variable 'font-lock-defaults)
-       '(gnus-server-font-lock-keywords t)))
+  (setq-local font-lock-defaults '(gnus-server-font-lock-keywords t)))
 
 
 (defun gnus-server-insert-server-line (name method)

@@ -1,6 +1,6 @@
 ;;; disass.el --- disassembler for compiled Emacs Lisp code  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1986, 1991, 2002-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1986, 1991, 2002-2021 Free Software Foundation, Inc.
 
 ;; Author: Doug Cutting <doug@csli.stanford.edu>
 ;;	Jamie Zawinski <jwz@lucid.com>
@@ -57,10 +57,9 @@ If OBJECT is not already compiled, we compile it, but do not
 redefine OBJECT if it is a symbol."
   (interactive
    (let* ((fn (function-called-at-point))
-          (prompt (if fn (format "Disassemble function (default %s): " fn)
-                    "Disassemble function: "))
           (def (and fn (symbol-name fn))))
-     (list (intern (completing-read prompt obarray 'fboundp t nil nil def))
+     (list (intern (completing-read (format-prompt "Disassemble function" fn)
+                                    obarray 'fboundp t nil nil def))
            nil 0 t)))
   (if (and (consp object) (not (functionp object)))
       (setq object `(lambda () ,object)))

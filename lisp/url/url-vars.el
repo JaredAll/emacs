@@ -1,6 +1,6 @@
-;;; url-vars.el --- Variables for Uniform Resource Locator tool
+;;; url-vars.el --- Variables for Uniform Resource Locator tool  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1996-1999, 2001, 2004-2020 Free Software Foundation,
+;; Copyright (C) 1996-1999, 2001, 2004-2021 Free Software Foundation,
 ;; Inc.
 
 ;; Keywords: comm, data, processes, hypermedia
@@ -24,6 +24,7 @@
 
 (defconst url-version "Emacs"
   "Version number of URL package.")
+(make-obsolete-variable 'url-version nil "28.1")
 
 (defgroup url nil
   "Uniform Resource Locator tool."
@@ -310,13 +311,6 @@ get the first available language (as opposed to the default)."
 Applies when a protected document is denied by the server."
   :type 'integer
   :group 'url)
-
-(defcustom url-temporary-directory (or (getenv "TMPDIR") "/tmp")
-  "Where temporary files go."
-  :type 'directory
-  :group 'url-file)
-(make-obsolete-variable 'url-temporary-directory
-			'temporary-file-directory "23.1")
 
 (defcustom url-show-status t
   "Whether to show a running total of bytes transferred.

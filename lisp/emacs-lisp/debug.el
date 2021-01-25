@@ -1,6 +1,6 @@
 ;;; debug.el --- debuggers and related commands for Emacs  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1994, 2001-2020 Free Software Foundation,
+;; Copyright (C) 1985-1986, 1994, 2001-2021 Free Software Foundation,
 ;; Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -29,7 +29,6 @@
 
 (require 'cl-lib)
 (require 'backtrace)
-(require 'button)
 
 (defgroup debugger nil
   "Debuggers and related commands for Emacs."
@@ -320,6 +319,17 @@ the debugger will not be entered."
      (message "Error in debug printer: %S" err)
      (prin1 obj stream))))
 
+(make-obsolete 'debugger-insert-backtrace
+               "use a `backtrace-mode' buffer or `backtrace-to-string'."
+               "Emacs 27.1")
+
+(defun debugger-insert-backtrace (frames do-xrefs)
+  "Format and insert the backtrace FRAMES at point.
+Make functions into cross-reference buttons if DO-XREFS is non-nil."
+  (insert (if do-xrefs
+              (backtrace--to-string frames)
+            (backtrace-to-string frames))))
+
 (defun debugger-setup-buffer (args)
   "Initialize the `*Backtrace*' buffer for entry to the debugger.
 That buffer should be current already and in debugger-mode."
@@ -527,6 +537,9 @@ The environment used is the one when entering the activation frame at point."
           (let ((str (eval-expression-print-format val)))
             (if str (princ str t))))))))
 
+(define-obsolete-function-alias 'debugger-toggle-locals
+  'backtrace-toggle-locals "28.1")
+
 
 (defvar debugger-mode-map
   (let ((map (make-keymap)))
@@ -621,6 +634,9 @@ Complete list of commands:
 	     (buffer-substring (line-beginning-position 0)
 			       (line-end-position 0)))))
 
+(define-obsolete-function-alias 'debug-help-follow
+  'backtrace-help-follow-symbol "28.1")
+
 
 ;; When you change this, you may also need to change the number of
 ;; frames that the debugger skips.
@@ -653,9 +669,7 @@ Redefining FUNCTION also cancels it."
      (when (special-form-p fn)
        (setq fn nil))
      (setq val (completing-read
-		(if fn
-		    (format "Debug on entry to function (default %s): " fn)
-		  "Debug on entry to function: ")
+                (format-prompt "Debug on entry to function" fn)
 		obarray
 		#'(lambda (symbol)
 		    (and (fboundp symbol)
@@ -758,8 +772,7 @@ another symbol also cancels it."
    (let* ((var-at-point (variable-at-point))
           (var (and (symbolp var-at-point) var-at-point))
           (val (completing-read
-                (concat "Debug when setting variable"
-                        (if var (format " (default %s): " var) ": "))
+                (format-prompt "Debug when setting variable" var)
                 obarray #'boundp
                 t nil nil (and var (symbol-name var)))))
      (list (if (equal val "") var (intern val)))))

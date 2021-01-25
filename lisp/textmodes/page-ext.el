@@ -1,6 +1,6 @@
 ;;; page-ext.el --- extended page handling commands  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1990-1991, 1993-1994, 2001-2020 Free Software
+;; Copyright (C) 1990-1991, 1993-1994, 2001-2021 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Robert J. Chassell <bob@gnu.org>
@@ -429,20 +429,19 @@ REVERSE (non-nil means reverse order), BEG and END (region to sort)."
                ;; NEXTRECFUN is called with point at the end of the
                ;; previous record. It moves point to the start of the
                ;; next record.
-	       (function (lambda ()
-                           (re-search-forward page-delimiter nil t)
-                           (skip-chars-forward " \t\n")
-                           ))
+               (lambda ()
+                 (re-search-forward page-delimiter nil t)
+                 (skip-chars-forward " \t\n"))
 
                ;; ENDRECFUN is called with point within the record.
                ;; It should move point to the end of the record.
-	       (function (lambda ()
-                           (if (re-search-forward
-                                page-delimiter
-                                nil
-                                t)
-                               (goto-char (match-beginning 0))
-                             (goto-char (point-max))))))))
+               (lambda ()
+                 (if (re-search-forward
+                      page-delimiter
+                      nil
+                      t)
+                     (goto-char (match-beginning 0))
+                   (goto-char (point-max)))))))
 
 (define-obsolete-function-alias 'sort-pages-buffer #'pages-sort-buffer "27.1")
 (defun pages-sort-buffer (&optional reverse)

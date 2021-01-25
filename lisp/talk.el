@@ -1,6 +1,6 @@
 ;;; talk.el --- allow several users to talk to each other through Emacs
 
-;; Copyright (C) 1995, 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1995, 2001-2021 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: comm, frames
@@ -90,7 +90,7 @@ Each element has the form (DISPLAY FRAME BUFFER).")
       (let ((frame (nth 1 (car tail)))
 	    (this-buffer (nth 2 (car tail)))
 	    (buffers
-	     (mapcar (function (lambda (elt) (nth 2 elt)))
+             (mapcar (lambda (elt) (nth 2 elt))
 		     talk-display-alist)))
 	;; Put this display's own talk buffer
 	;; at the front of the list.

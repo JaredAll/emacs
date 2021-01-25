@@ -1,6 +1,6 @@
 ;;; edt-mapper.el --- create an EDT LK-201 map file for X-Windows Emacs
 
-;; Copyright (C) 1994-1995, 2000-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1994-1995, 2000-2021 Free Software Foundation, Inc.
 
 ;; Author: Kevin Gallagher <kevin.gal@verizon.net>
 ;; Keywords: emulations
@@ -510,7 +510,8 @@
 	       (if window-system (concat "-" (upcase (symbol-name window-system))))
 	       "-keys")))
     (set-visited-file-name
-     (read-file-name (format "Save key mapping to file (default %s): " file) nil file)))
+     (read-file-name (format-prompt "Save key mapping to file" file)
+                     nil file)))
   (save-buffer)
 
   (message "That's it!  Press any key to exit")

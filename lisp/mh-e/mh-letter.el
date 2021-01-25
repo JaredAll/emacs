@@ -1,6 +1,6 @@
 ;;; mh-letter.el --- MH-Letter mode
 
-;; Copyright (C) 1993, 1995, 1997, 2000-2020 Free Software Foundation,
+;; Copyright (C) 1993, 1995, 1997, 2000-2021 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Bill Wohler <wohler@newt.com>
@@ -330,7 +330,7 @@ order).
    (t
     ;; ...or the header only
     (setq font-lock-defaults '((mh-show-font-lock-keywords) t))))
-  (easy-menu-add mh-letter-menu)
+  (mh-do-in-xemacs (easy-menu-add mh-letter-menu))
   ;; Maybe we want to use the existing Mail menu from mail-mode in
   ;; 9.0; in the mean time, let's remove it since the redundancy will
   ;; only produce confusion.

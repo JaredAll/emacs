@@ -1,7 +1,7 @@
 /* movemail foo bar -- move file foo to file bar,
    locking file foo the way /bin/mail respects.
 
-Copyright (C) 1986, 1992-1994, 1996, 1999, 2001-2020 Free Software
+Copyright (C) 1986, 1992-1994, 1996, 1999, 2001-2021 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -580,7 +580,7 @@ pfatal_with_name (char *name)
 static void
 pfatal_and_delete (char *name)
 {
-  char *s = strerror (errno);
+  const char *s = strerror (errno);
   unlink (name);
   fatal ("%s for %s", s, name);
 }

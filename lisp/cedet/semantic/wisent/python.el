@@ -1,6 +1,6 @@
 ;;; wisent-python.el --- Semantic support for Python
 
-;; Copyright (C) 2002, 2004, 2006-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2002, 2004, 2006-2021 Free Software Foundation, Inc.
 
 ;; Author: Richard Kim <emacs18@gmail.com>
 ;; Created: June 2002
@@ -503,10 +503,10 @@ Shortens `code' tags, but passes through for others."
 (defun wisent-python-default-setup ()
   "Setup buffer for parse."
   (wisent-python-wy--install-parser)
-  (set (make-local-variable 'parse-sexp-ignore-comments) t)
+  (setq-local parse-sexp-ignore-comments t)
   ;; Give python modes the possibility to overwrite this:
   (if (not comment-start-skip)
-      (set (make-local-variable 'comment-start-skip) "#+\\s-*"))
+      (setq-local comment-start-skip "#+\\s-*"))
   (setq
   ;; Character used to separation a parent/child relationship
    semantic-type-relation-separator-character '(".")

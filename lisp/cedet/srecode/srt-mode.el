@@ -1,6 +1,6 @@
 ;;; srecode/srt-mode.el --- Major mode for writing screcode macros
 
-;; Copyright (C) 2005, 2007-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2005, 2007-2021 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -191,18 +191,18 @@ we can tell font lock about them.")
 (define-derived-mode srecode-template-mode fundamental-mode "SRecode"
   ;; FIXME: Shouldn't it derive from prog-mode?
   "Major-mode for writing SRecode macros."
-  (set (make-local-variable 'comment-start) ";;")
-  (set (make-local-variable 'comment-end) "")
-  (set (make-local-variable 'parse-sexp-ignore-comments) t)
-  (set (make-local-variable 'comment-start-skip)
-       "\\(\\(^\\|[^\\\n]\\)\\(\\\\\\\\\\)*\\);+ *")
-  (set (make-local-variable 'font-lock-defaults)
-       '(srecode-font-lock-keywords
-         nil  ;; perform string/comment fontification
-         nil  ;; keywords are case sensitive.
-         ;; This puts _ & - as a word constituent,
-         ;; simplifying our keywords significantly
-         ((?_ . "w") (?- . "w")))))
+  (setq-local comment-start ";;")
+  (setq-local comment-end "")
+  (setq-local parse-sexp-ignore-comments t)
+  (setq-local comment-start-skip
+              "\\(\\(^\\|[^\\\n]\\)\\(\\\\\\\\\\)*\\);+ *")
+  (setq-local font-lock-defaults
+              '(srecode-font-lock-keywords
+                nil  ;; perform string/comment fontification
+                nil  ;; keywords are case sensitive.
+                ;; This puts _ & - as a word constituent,
+                ;; simplifying our keywords significantly
+                ((?_ . "w") (?- . "w")))))
 
 ;;;###autoload
 (defalias 'srt-mode 'srecode-template-mode)

@@ -1,6 +1,6 @@
 ;;; titdic-cnv.el --- convert cxterm dictionary (TIT format) to Quail package -*- coding:iso-2022-7bit; lexical-binding:t -*-
 
-;; Copyright (C) 1997-1998, 2000-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1997-1998, 2000-2021 Free Software Foundation, Inc.
 ;; Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
 ;;   2005, 2006, 2007, 2008, 2009, 2010, 2011
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -553,7 +553,7 @@ To get complete usage, invoke \"emacs -batch -f batch-titdic-convert -h\"."
 	(if (file-directory-p filename)
 	    (progn
 	      (message "Converting all tit files in the directory %s" filename)
-	      (setq files (directory-files filename t "\\.tit$")))
+	      (setq files (directory-files filename t "\\.tit\\'")))
 	  (setq files (list filename)))
 	(while files
 	  (setq file (expand-file-name (car files)))
@@ -795,7 +795,7 @@ To get complete usage, invoke \"emacs -batch -f batch-titdic-convert -h\"."
 	    (forward-line 1)))
 	(maphash #'(lambda (key val) (setq dic (cons (cons key val) dic)))
 		 table)))
-    (setq dic (sort dic (function (lambda (x y) (string< (car x ) (car y))))))
+    (setq dic (sort dic (lambda (x y) (string< (car x ) (car y)))))
     (dolist (elt dic)
       (insert (format "(%S\t%S)\n" (car elt) (cdr elt))))
     (let ((punctuation '((";" "$(0!'!2!"!#!.!/(B" "$(G!'!2!"!#!.!/(B")
@@ -956,7 +956,7 @@ method `chinese-tonepy' with which you must specify tones by digits
 			     (setq trans (mapconcat 'identity trans "")))))
 		     (setq dic (cons (cons key trans) dic)))
 		 table)))
-    (setq dic (sort dic (function (lambda (x y) (string< (car x) (car y))))))
+    (setq dic (sort dic (lambda (x y) (string< (car x) (car y)))))
     (goto-char (point-max))
     (insert (format "%S\n" "$A::WVJdHk!K!>WTH;!?!K(B
 

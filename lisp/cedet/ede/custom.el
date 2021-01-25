@@ -1,6 +1,6 @@
 ;;; ede/custom.el --- customization of EDE projects.
 
-;; Copyright (C) 2010-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2010-2021 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -50,8 +50,7 @@
   (let* ((ov (oref (ede-current-project) local-variables))
 	 (cp (ede-current-project)))
     (ede-customize cp)
-    (make-local-variable 'eieio-ede-old-variables)
-    (setq eieio-ede-old-variables ov)))
+    (setq-local eieio-ede-old-variables ov)))
 
 ;;;###autoload
 (defalias 'customize-project 'ede-customize-project)

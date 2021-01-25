@@ -1,6 +1,6 @@
 ;;; rlogin.el --- remote login interface  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1992-1995, 1997-1998, 2001-2020 Free Software
+;; Copyright (C) 1992-1995, 1997-1998, 2001-2021 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Noah Friedman <friedman@splode.com>
@@ -208,10 +208,8 @@ variable."
     (unless (comint-check-proc buffer-name)
       (comint-exec buffer buffer-name rlogin-program nil args)
       (rlogin-mode)
-      (make-local-variable 'rlogin-host)
-      (setq rlogin-host host)
-      (make-local-variable 'rlogin-remote-user)
-      (setq rlogin-remote-user user)
+      (setq-local rlogin-host host)
+      (setq-local rlogin-remote-user user)
       (ignore-errors
         (cond ((eq rlogin-directory-tracking-mode t)
                ;; Do this here, rather than calling the tracking mode

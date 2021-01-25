@@ -1,6 +1,6 @@
 ;;; em-basic.el --- basic shell builtin commands  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1999-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2021 Free Software Foundation, Inc.
 
 ;; Author: John Wiegley <johnw@gnu.org>
 
@@ -90,11 +90,10 @@ or `eshell-printn' for display."
 	     (car args))
 	    (t
 	     (mapcar
-	      (function
-	       (lambda (arg)
-		 (if (stringp arg)
-		     (set-text-properties 0 (length arg) nil arg))
-		 arg))
+              (lambda (arg)
+                (if (stringp arg)
+                    (set-text-properties 0 (length arg) nil arg))
+                arg)
 	      args)))))
       (if output-newline
 	  (cond

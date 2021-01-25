@@ -1,6 +1,6 @@
 ;;; semantic/db.el --- Semantic tag database manager  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2000-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2021 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: tags
@@ -89,7 +89,7 @@ same major mode as the current buffer.")
 	 :documentation "The tags belonging to this table.")
    (db-refs :initform nil
 	    :documentation
-	    "List of `semanticdb-table' objects refering to this one.
+	    "List of `semanticdb-table' objects referring to this one.
 These aren't saved, but are instead recalculated after load.
 See the file semanticdb-ref.el for how this slot is used.")
    (index :type semanticdb-abstract-search-index
@@ -764,7 +764,7 @@ If a particular major mode wants to search any mode, put the
 Do not set the value of this variable permanently.")
 
 (defmacro semanticdb-with-match-any-mode (&rest body)
-  "A Semanticdb search occurring withing BODY will search tags in all modes.
+  "A Semanticdb search occurring within BODY will search tags in all modes.
 This temporarily sets `semanticdb-match-any-mode' while executing BODY."
   (declare (indent 0) (debug t))
   `(let ((semanticdb-match-any-mode t))

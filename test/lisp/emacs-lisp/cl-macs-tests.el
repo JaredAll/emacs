@@ -1,6 +1,6 @@
 ;;; cl-macs-tests.el --- tests for emacs-lisp/cl-macs.el  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2017-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2017-2021 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -38,6 +38,15 @@
                           and c = (cl-third numlist)
                           collect (list c b a))
                  '((4.0 2 1) (8.3 6 5) (10.4 9 8)))))
+
+(ert-deftest cl-macs-loop-and-arrays ()
+  "Bug#40727"
+  (should (equal (cl-loop for y = (- (or x 0)) and x across [1 2]
+                          collect (cons x y))
+                 '((1 . 0) (2 . -1))))
+  (should (equal (cl-loop for x across [1 2] and y = (- (or x 0))
+                          collect (cons x y))
+                 '((1 . 0) (2 . -1)))))
 
 (ert-deftest cl-macs-loop-destructure ()
   (should (equal (cl-loop for (a b c) in '((1 2 4.0) (5 6 8.3) (8 9 10.4))
@@ -416,7 +425,9 @@ collection clause."
                  '(2 3 4 5 6))))
 
 (ert-deftest cl-macs-loop-across-ref ()
-  (should (equal (cl-loop with my-vec = ["one" "two" "three"]
+  (should (equal (cl-loop with my-vec = (vector (cl-copy-seq "one")
+                                                (cl-copy-seq "two")
+                                                (cl-copy-seq "three"))
                           for x across-ref my-vec
                           do (setf (aref x 0) (upcase (aref x 0)))
                           finally return my-vec)
@@ -589,5 +600,37 @@ collection clause."
                    and z = 1
                    collect y into result1
                    finally return  (equal (nreverse result) result1))))
+
+(ert-deftest cl-macs-aux-edebug ()
+  "Check that Bug#40431 is fixed."
+  (with-temp-buffer
+    (prin1 '(cl-defun cl-macs-aux-edebug-test-fun (&aux ((a . b) '(1 . 2)))
+              (list a b))
+           (current-buffer))
+    ;; Just make sure the function can be instrumented.
+    (edebug-defun)))
+
+;;; cl-labels
+
+(ert-deftest cl-macs--labels ()
+  ;; Simple recursive function.
+  (cl-labels ((len (xs) (if xs (1+ (len (cdr xs))) 0)))
+    (should (equal (len (make-list 42 t)) 42)))
+
+  ;; Simple tail-recursive function.
+  (cl-labels ((len (xs n) (if xs (len (cdr xs) (1+ n)) n)))
+    (should (equal (len (make-list 42 t) 0) 42))
+    ;; Should not bump into stack depth limits.
+    (should (equal (len (make-list 42000 t) 0) 42000)))
+
+  ;; Check that non-recursive functions are handled more efficiently.
+  (should (pcase (macroexpand '(cl-labels ((f (x) (+ x 1))) (f 5)))
+            (`(let* ,_ (funcall ,_ 5)) t)))
+
+  ;; Case of "tail-recursive lambdas".
+  (should (pcase (macroexpand
+                  '(cl-labels ((len (xs n) (if xs (len (cdr xs) (1+ n)) n)))
+                     #'len))
+            (`(function (lambda (,_ ,_) . ,_)) t))))
 
 ;;; cl-macs-tests.el ends here

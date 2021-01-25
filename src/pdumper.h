@@ -1,6 +1,6 @@
 /* Header file for the portable dumper.
 
-Copyright (C) 2016, 2018-2020 Free Software Foundation, Inc.
+Copyright (C) 2016, 2018-2021 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -256,6 +256,7 @@ pdumper_clear_marks (void)
    file was loaded.  */
 extern void pdumper_record_wd (const char *);
 
+void init_pdumper_once (void);
 void syms_of_pdumper (void);
 
 INLINE_HEADER_END

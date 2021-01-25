@@ -1,6 +1,6 @@
 ;;; sendmail.el --- mail sending commands for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985-1986, 1992-1996, 1998, 2000-2020 Free Software
+;; Copyright (C) 1985-1986, 1992-1996, 1998, 2000-2021 Free Software
 ;; Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
@@ -73,7 +73,7 @@ Otherwise, most addresses look like `angles', but they look like
   :version "27.1")
 (make-obsolete-variable
  'mail-from-style
- "only the `angles' value is valid according to RFC2822." "27.1" 'set)
+ "only the `angles' value is valid according to RFC5322." "27.1" 'set)
 
 ;;;###autoload
 (defcustom mail-specify-envelope-from nil
@@ -529,7 +529,7 @@ This also saves the value of `send-mail-function' via Customize."
 	    (display-buffer (current-buffer))
 	    (let ((completion-ignore-case t))
               (completing-read
-               (format "Send mail via (default %s): " (caar options))
+               (format-prompt "Send mail via" (caar options))
                options nil 'require-match nil nil (car options))))))
     ;; Return the choice.
     (cdr (assoc-string choice options t))))
@@ -691,29 +691,25 @@ Turning on Mail mode runs the normal hooks `text-mode-hook' and
   (make-local-variable 'mail-reply-action)
   (make-local-variable 'mail-send-actions)
   (make-local-variable 'mail-return-action)
-  (make-local-variable 'mail-encode-mml)
-  (setq mail-encode-mml nil)
+  (setq-local mail-encode-mml nil)
   (setq buffer-offer-save t)
-  (make-local-variable 'font-lock-defaults)
-  (setq font-lock-defaults '(mail-font-lock-keywords t t))
+  (setq-local font-lock-defaults '(mail-font-lock-keywords t t))
   (make-local-variable 'paragraph-separate)
   (setq-local normal-auto-fill-function #'mail-mode-auto-fill)
   (setq-local fill-paragraph-function #'mail-mode-fill-paragraph)
   ;; Allow using comment commands to add/remove quoting (this only does
   ;; anything if mail-yank-prefix is set to a non-nil value).
-  (set (make-local-variable 'comment-start) mail-yank-prefix)
+  (setq-local comment-start mail-yank-prefix)
   (if mail-yank-prefix
-      (set (make-local-variable 'comment-start-skip)
-	   (concat "^" (regexp-quote mail-yank-prefix) "[ \t]*")))
-  (make-local-variable 'adaptive-fill-regexp)
+      (setq-local comment-start-skip
+                  (concat "^" (regexp-quote mail-yank-prefix) "[ \t]*")))
   ;; Also update the paragraph-separate entry if you change this.
-  (setq adaptive-fill-regexp
-	(concat "[ \t]*[-[:alnum:]]+>+[ \t]*\\|"
-		adaptive-fill-regexp))
-  (make-local-variable 'adaptive-fill-first-line-regexp)
-  (setq adaptive-fill-first-line-regexp
-	(concat "[ \t]*[-[:alnum:]]*>+[ \t]*\\|"
-		adaptive-fill-first-line-regexp))
+  (setq-local adaptive-fill-regexp
+              (concat "[ \t]*[-[:alnum:]]+>+[ \t]*\\|"
+                      adaptive-fill-regexp))
+  (setq-local adaptive-fill-first-line-regexp
+              (concat "[ \t]*[-[:alnum:]]*>+[ \t]*\\|"
+                      adaptive-fill-first-line-regexp))
   (add-hook 'completion-at-point-functions #'mail-completion-at-point-function
             nil 'local)
   ;; `-- ' precedes the signature.  `-----' appears at the start of the
@@ -975,7 +971,7 @@ but lower priority than the local value of `buffer-file-coding-system'.
 See also the function `select-message-coding-system'.")
 
 ;;;###autoload
-(defvar default-sendmail-coding-system 'iso-latin-1
+(defvar default-sendmail-coding-system 'utf-8
   "Default coding system for encoding the outgoing mail.
 This variable is used only when `sendmail-coding-system' is nil.
 

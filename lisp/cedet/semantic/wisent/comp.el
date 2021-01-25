@@ -1,6 +1,6 @@
 ;;; semantic/wisent/comp.el --- GNU Bison for Emacs - Grammar compiler
 
-;; Copyright (C) 1984, 1986, 1989, 1992, 1995, 2000-2007, 2009-2020 Free
+;; Copyright (C) 1984, 1986, 1989, 1992, 1995, 2000-2007, 2009-2021 Free
 ;; Software Foundation, Inc.
 
 ;; Author: David Ponce <david@dponce.com>
@@ -3053,7 +3053,7 @@ one.")
 
 (defsubst wisent-ISVALID-TOKEN (x)
   "Return non-nil if X is a character or an allowed symbol."
-  (or (wisent-char-p x)
+  (or (characterp x)
       (wisent-ISVALID-VAR x)))
 
 (defun wisent-push-token (symbol &optional nocheck)
@@ -3143,7 +3143,7 @@ the rule."
             (cond
              ((or (memq item token-list) (memq item var-list)))
              ;; Create new literal character token
-             ((wisent-char-p item) (wisent-push-token item t))
+             ((characterp item) (wisent-push-token item t))
              ((error "Symbol `%s' is used, but is not defined as a token and has no rules"
                      item))))
           (setq rhl (1+ rhl)

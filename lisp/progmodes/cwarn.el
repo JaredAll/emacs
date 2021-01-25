@@ -1,10 +1,10 @@
 ;;; cwarn.el --- highlight suspicious C and C++ constructions
 
-;; Copyright (C) 1999-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2021 Free Software Foundation, Inc.
 
 ;; Author: Anders Lindgren
 ;; Keywords: c, languages, faces
-;; Version: 1.3.1
+;; Old-Version: 1.3.1
 
 ;; This file is part of GNU Emacs.
 
@@ -104,8 +104,6 @@
 
 ;;{{{ Dependencies
 
-(require 'custom)
-(require 'font-lock)
 (require 'cc-mode)
 
 ;;}}}

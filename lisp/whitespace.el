@@ -1,11 +1,11 @@
 ;;; whitespace.el --- minor mode to visualize TAB, (HARD) SPACE, NEWLINE -*- lexical-binding: t -*-
 
-;; Copyright (C) 2000-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2021 Free Software Foundation, Inc.
 
 ;; Author: Vinicius Jose Latorre <viniciusjl.gnu@gmail.com>
 ;; Keywords: data, wp
 ;; Version: 13.2.2
-;; X-URL: http://www.emacswiki.org/cgi-bin/wiki/ViniciusJoseLatorre
+;; X-URL: https://www.emacswiki.org/cgi-bin/wiki/ViniciusJoseLatorre
 
 ;; This file is part of GNU Emacs.
 
@@ -85,19 +85,6 @@
 ;;
 ;; * if global whitespace is turned off, whitespace continues on only
 ;;   in the buffers in which local whitespace is on.
-;;
-;; To use whitespace, insert in your ~/.emacs:
-;;
-;;    (require 'whitespace)
-;;
-;; Or autoload at least one of the commands`whitespace-mode',
-;; `whitespace-toggle-options', `global-whitespace-mode' or
-;; `global-whitespace-toggle-options'.  For example:
-;;
-;;    (autoload 'whitespace-mode           "whitespace"
-;;      "Toggle whitespace visualization."        t)
-;;    (autoload 'whitespace-toggle-options "whitespace"
-;;      "Toggle local `whitespace-mode' options." t)
 ;;
 ;; whitespace was inspired by:
 ;;
@@ -262,7 +249,7 @@
 ;;
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;; code:
+;;; Code:
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -283,7 +270,8 @@
   '(face
     tabs spaces trailing lines space-before-tab newline
     indentation empty space-after-tab
-    space-mark tab-mark newline-mark)
+    space-mark tab-mark newline-mark
+    missing-newline-at-eof)
   "Specify which kind of blank is visualized.
 
 It's a list containing some or all of the following values:
@@ -323,6 +311,11 @@ It's a list containing some or all of the following values:
 			`whitespace-style'.
 
    newline		NEWLINEs are visualized via faces.
+			It has effect only if `face' (see above)
+			is present in `whitespace-style'.
+
+   missing-newline-at-eof Missing newline at the end of the file is
+                        visualized via faces.
 			It has effect only if `face' (see above)
 			is present in `whitespace-style'.
 
@@ -439,6 +432,8 @@ See also `whitespace-display-mappings' for documentation."
               (const :tag "(Face) Lines" lines)
               (const :tag "(Face) Lines, only overlong part" lines-tail)
               (const :tag "(Face) NEWLINEs" newline)
+              (const :tag "(Face) Missing newlines at EOB"
+                     missing-newline-at-eof)
               (const :tag "(Face) Empty Lines At BOB And/Or EOB" empty)
               (const :tag "(Face) Indentation SPACEs" indentation::tab)
               (const :tag "(Face) Indentation TABs"
@@ -586,6 +581,10 @@ line.  Used when `whitespace-style' includes the value `indentation'.")
   "Face used to visualize big indentation."
   :group 'whitespace)
 
+(defface whitespace-missing-newline-at-eof
+  '((((class mono)) :inverse-video t :weight bold :underline t)
+    (t :background "#d0d040" :foreground "black"))
+  "Face used to visualize missing newline at the end of the file.")
 
 (defvar whitespace-empty 'whitespace-empty
   "Symbol face used to visualize empty lines at beginning and/or end of buffer.
@@ -716,7 +715,7 @@ and the cons cdr is used for TABs visualization.
 
 Used when `whitespace-style' includes `indentation',
 `indentation::tab' or  `indentation::space'."
-  :type '(cons (regexp :tag "Indentation SPACEs")
+  :type '(cons (string :tag "Indentation SPACEs")
 	       (regexp :tag "Indentation TABs"))
   :group 'whitespace)
 
@@ -747,8 +746,8 @@ and the cons cdr is used for TABs visualization.
 
 Used when `whitespace-style' includes `space-after-tab',
 `space-after-tab::tab' or `space-after-tab::space'."
-  :type '(cons (regexp :tag "SPACEs After TAB")
-	       regexp)
+  :type '(cons (string :tag "SPACEs After TAB")
+	       string)
   :group 'whitespace)
 
 (defcustom whitespace-big-indent-regexp
@@ -1700,6 +1699,8 @@ cleaning up these problems."
                           (whitespace-space-after-tab-regexp 'tab))
                          ((eq (car option) 'space-after-tab::space)
                           (whitespace-space-after-tab-regexp 'space))
+                         ((eq (car option) 'missing-newline-at-eof)
+                          "[^\n]\\'")
                          (t
                           (cdr option)))))
                    (when (re-search-forward regexp rend t)
@@ -1985,13 +1986,13 @@ resultant list will be returned."
   ;; prepare local hooks
   (add-hook 'write-file-functions 'whitespace-write-file-hook nil t)
   ;; create whitespace local buffer environment
-  (set (make-local-variable 'whitespace-font-lock-keywords) nil)
-  (set (make-local-variable 'whitespace-display-table) nil)
-  (set (make-local-variable 'whitespace-display-table-was-local) nil)
-  (set (make-local-variable 'whitespace-active-style)
-       (if (listp whitespace-style)
-	   whitespace-style
-	 (list whitespace-style)))
+  (setq-local whitespace-font-lock-keywords nil)
+  (setq-local whitespace-display-table nil)
+  (setq-local whitespace-display-table-was-local nil)
+  (setq-local whitespace-active-style
+              (if (listp whitespace-style)
+	          whitespace-style
+	        (list whitespace-style)))
   ;; turn on whitespace
   (when whitespace-active-style
     (whitespace-color-on)
@@ -2033,19 +2034,14 @@ resultant list will be returned."
   "Turn on color visualization."
   (when (whitespace-style-face-p)
     ;; save current point and refontify when necessary
-    (set (make-local-variable 'whitespace-point)
-         (point))
+    (setq-local whitespace-point (point))
     (setq whitespace-point--used
           (let ((ol (make-overlay (point) (point) nil nil t)))
             (delete-overlay ol) ol))
-    (set (make-local-variable 'whitespace-font-lock-refontify)
-	 0)
-    (set (make-local-variable 'whitespace-bob-marker)
-	 (point-min-marker))
-    (set (make-local-variable 'whitespace-eob-marker)
-	 (point-max-marker))
-    (set (make-local-variable 'whitespace-buffer-changed)
-	 nil)
+    (setq-local whitespace-font-lock-refontify 0)
+    (setq-local whitespace-bob-marker (point-min-marker))
+    (setq-local whitespace-eob-marker (point-max-marker))
+    (setq-local whitespace-buffer-changed nil)
     (add-hook 'post-command-hook #'whitespace-post-command-hook nil t)
     (add-hook 'before-change-functions #'whitespace-buffer-changed nil t)
     ;; Add whitespace-mode color into font lock.
@@ -2122,7 +2118,16 @@ resultant list will be returned."
                 ((memq 'space-after-tab::space whitespace-active-style)
                  ;; Show SPACEs after TAB (TABs).
                  (whitespace-space-after-tab-regexp 'space)))
-              1 whitespace-space-after-tab t)))))
+              1 whitespace-space-after-tab t)))
+       ,@(when (memq 'missing-newline-at-eof whitespace-active-style)
+           ;; Show missing newline.
+           `(("[^\n]\\'" 0
+              ;; Don't mark the end of the buffer is point is there --
+              ;; it probably means that the user is typing something
+              ;; at the end of the buffer.
+              (and (/= whitespace-point (point-max))
+                   'whitespace-missing-newline-at-eof)
+              t)))))
     (font-lock-add-keywords nil whitespace-font-lock-keywords t)
     (font-lock-flush)))
 
@@ -2450,7 +2455,8 @@ It should be added buffer-locally to `write-file-functions'."
 
 (provide 'whitespace)
 
-
+(make-obsolete-variable 'whitespace-load-hook
+                        "use `with-eval-after-load' instead." "28.1")
 (run-hooks 'whitespace-load-hook)
 
 

@@ -1,4 +1,4 @@
-;;; burmese.el --- support for Burmese -*- coding: utf-8 -*-
+;;; burmese.el --- support for Burmese -*- coding: utf-8; lexical-binding: t -*-
 
 ;; Copyright (C) 2008, 2009, 2010, 2011
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -23,7 +23,6 @@
 
 ;;; Commentary:
 
-;; Aung San Suu Kyi says to call her country "Burma".
 ;; The murderous generals say to call it "Myanmar".
 ;; We will call it "Burma". -- rms, Chief GNUisance.
 

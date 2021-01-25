@@ -1,6 +1,6 @@
 ;;; mml2015.el --- MIME Security with Pretty Good Privacy (PGP)
 
-;; Copyright (C) 2000-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2021 Free Software Foundation, Inc.
 
 ;; Author: Shenghuo Zhu <zsh@cs.rochester.edu>
 ;; Keywords: PGP MIME MML
@@ -712,7 +712,6 @@ If set, it overrides the setting of `mml2015-sign-with-sender'."
 (autoload 'epg-verify-string "epg")
 (autoload 'epg-sign-string "epg")
 (autoload 'epg-encrypt-string "epg")
-(autoload 'epg-passphrase-callback-function "epg")
 (autoload 'epg-context-set-passphrase-callback "epg")
 (autoload 'epg-key-sub-key-list "epg")
 (autoload 'epg-sub-key-capability "epg")
@@ -736,8 +735,9 @@ If set, it overrides the setting of `mml2015-sign-with-sender'."
     (let* ((coding-system-for-write 'binary)
            (coding-system-for-read 'binary)
            (data (shell-command-to-string
-                  (format "%s --list-options no-show-photos --attribute-fd 3 --list-keys %s 3>&1 >/dev/null 2>&1"
-                          (shell-quote-argument epg-gpg-program) key-id))))
+                  (format "%s --list-options no-show-photos --attribute-fd 3 --list-keys %s 3>&1 >%s 2>&1"
+                          (shell-quote-argument epg-gpg-program)
+			  key-id null-device))))
       (when (> (length data) 0)
         (insert (substring data 16))
 	(condition-case nil

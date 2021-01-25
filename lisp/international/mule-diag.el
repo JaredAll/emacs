@@ -1,6 +1,6 @@
 ;;; mule-diag.el --- show diagnosis of multilingual environment (Mule)
 
-;; Copyright (C) 1997-1998, 2000-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1997-1998, 2000-2021 Free Software Foundation, Inc.
 ;; Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
 ;;   2005, 2006, 2007, 2008, 2009, 2010, 2011
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -136,13 +136,12 @@ SORT-KEY should be `name' or `iso-spec' (default `name')."
 
 		((eq sort-key 'iso-spec)
 		 ;; Sort by DIMENSION CHARS FINAL-CHAR
-		 (function
-		  (lambda (x y)
-		    (or (< (nth 1 x) (nth 1 y))
-			(and (= (nth 1 x) (nth 1 y))
-			     (or (< (nth 2 x) (nth 2 y))
-				 (and (= (nth 2 x) (nth 2 y))
-				      (< (nth 3 x) (nth 3 y)))))))))
+                 (lambda (x y)
+                   (or (< (nth 1 x) (nth 1 y))
+                       (and (= (nth 1 x) (nth 1 y))
+                            (or (< (nth 2 x) (nth 2 y))
+                                (and (= (nth 2 x) (nth 2 y))
+                                     (< (nth 3 x) (nth 3 y))))))))
 		(t
 		 (error "Invalid charset sort key: %s" sort-key))))
 
@@ -199,10 +198,6 @@ Character sets for defining other charsets, or for backward compatibility
 		   (charset-iso-final-char charset)
 ;;;		   (charset-iso-graphic-plane charset)
 		   (charset-description charset)))))
-
-(defvar non-iso-charset-alist nil
-  "Obsolete.")
-(make-obsolete-variable 'non-iso-charset-alist "no longer relevant." "23.1")
 
 ;; A variable to hold charset input history.
 (defvar charset-history nil)

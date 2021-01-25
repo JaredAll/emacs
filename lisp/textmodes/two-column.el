@@ -1,6 +1,6 @@
 ;;; two-column.el --- minor mode for editing of two-column text
 
-;; Copyright (C) 1992-1995, 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1992-1995, 2001-2021 Free Software Foundation, Inc.
 
 ;; Author: Daniel Pfeiffer <occitan@esperanto.org>
 ;; Adapted-By: ESR, Daniel Pfeiffer
@@ -388,9 +388,8 @@ First column's text    sSs  Second column's text
       (backward-char arg)
       (setq chars (buffer-substring (point) point))
       (skip-chars-forward " \t" point)
-      (make-local-variable '2C-separator)
-      (setq 2C-separator (buffer-substring (point) point)
-	    2C-window-width (+ (fringe-columns 'left)
+      (setq-local 2C-separator (buffer-substring (point) point))
+      (setq 2C-window-width (+ (fringe-columns 'left)
 			       (fringe-columns 'right)
 			       (scroll-bar-columns 'left)
 			       (scroll-bar-columns 'right)

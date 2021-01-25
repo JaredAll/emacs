@@ -1,6 +1,6 @@
 ;;; rfc2047.el --- functions for encoding and decoding rfc2047 messages  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1998-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2021 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;;	MORIOKA Tomohiko <morioka@jaist.ac.jp>
@@ -716,11 +716,13 @@ Point moves to the end of the region."
 	   (goto-char e)))))
 
 (defun rfc2047-fold-field ()
-  "Fold the current header field."
+  "Fold the current header field.
+Return the new end point."
   (save-excursion
     (save-restriction
       (rfc2047-narrow-to-field)
-      (rfc2047-fold-region (point-min) (point-max)))))
+      (rfc2047-fold-region (point-min) (point-max))
+      (point-max))))
 
 (defun rfc2047-fold-region (b e)
   "Fold long lines in region B to E."

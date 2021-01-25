@@ -1,10 +1,10 @@
 ;;; erc-hecomplete.el --- Provides Nick name completion for ERC
 
-;; Copyright (C) 2001-2002, 2004, 2006-2020 Free Software Foundation,
+;; Copyright (C) 2001-2002, 2004, 2006-2021 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Alex Schroeder <alex@gnu.org>
-;; URL: http://www.emacswiki.org/cgi-bin/wiki.pl?ErcCompletion
+;; URL: https://www.emacswiki.org/cgi-bin/wiki.pl?ErcCompletion
 ;; Obsolete-since: 24.1
 
 ;; This file is part of GNU Emacs.

@@ -1,11 +1,11 @@
 ;;; ebnf2ps.el --- translate an EBNF to a syntactic chart on PostScript  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1999-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2021 Free Software Foundation, Inc.
 
 ;; Author: Vinicius Jose Latorre <viniciusjl.gnu@gmail.com>
 ;; Keywords: wp, ebnf, PostScript
 ;; Version: 4.4
-;; X-URL: http://www.emacswiki.org/cgi-bin/wiki/ViniciusJoseLatorre
+;; X-URL: https://www.emacswiki.org/cgi-bin/wiki/ViniciusJoseLatorre
 
 ;; This file is part of GNU Emacs.
 
@@ -326,7 +326,7 @@ Please send all bug fixes and enhancements to
 ;;			`ebnf-lex-comment-char' and `ebnf-lex-eop-char'.
 ;;
 ;;    `abnf'		ebnf2ps recognizes the syntax described in the URL:
-;;			`http://www.ietf.org/rfc/rfc2234.txt'
+;;			`https://www.ietf.org/rfc/rfc2234.txt'
 ;;			("Augmented BNF for Syntax Specifications: ABNF").
 ;;
 ;;    `iso-ebnf'	ebnf2ps recognizes the syntax described in the URL:
@@ -342,11 +342,11 @@ Please send all bug fixes and enhancements to
 ;;			`ebnf-yac-ignore-error-recovery'.
 ;;
 ;;    `ebnfx'		ebnf2ps recognizes the syntax described in the URL:
-;;		     `http://www.w3.org/TR/2004/REC-xml-20040204/#sec-notation'
+;;		     `https://www.w3.org/TR/2004/REC-xml-20040204/#sec-notation'
 ;;		     ("Extensible Markup Language (XML) 1.0 (Third Edition)")
 ;;
 ;;    `dtd'		ebnf2ps recognizes the syntax described in the URL:
-;;			`http://www.w3.org/TR/2004/REC-xml-20040204/'
+;;			`https://www.w3.org/TR/2004/REC-xml-20040204/'
 ;;		     ("Extensible Markup Language (XML) 1.0 (Third Edition)")
 ;;
 ;; Any other value is treated as `ebnf'.
@@ -1779,7 +1779,7 @@ Valid values are:
 		`ebnf-lex-comment-char' and `ebnf-lex-eop-char'.
 
    `abnf'	ebnf2ps recognizes the syntax described in the URL:
-		`http://www.ietf.org/rfc/rfc2234.txt'
+                `https://www.ietf.org/rfc/rfc2234.txt'
 		(\"Augmented BNF for Syntax Specifications: ABNF\").
 
    `iso-ebnf'	ebnf2ps recognizes the syntax described in the URL:
@@ -1795,11 +1795,11 @@ Valid values are:
 		`ebnf-yac-ignore-error-recovery'.
 
    `ebnfx'	ebnf2ps recognizes the syntax described in the URL:
-		`http://www.w3.org/TR/2004/REC-xml-20040204/#sec-notation'
+                `https://www.w3.org/TR/2004/REC-xml-20040204/#sec-notation'
 		(\"Extensible Markup Language (XML) 1.0 (Third Edition)\")
 
    `dtd'	ebnf2ps recognizes the syntax described in the URL:
-		`http://www.w3.org/TR/2004/REC-xml-20040204/'
+                `https://www.w3.org/TR/2004/REC-xml-20040204/'
 		(\"Extensible Markup Language (XML) 1.0 (Third Edition)\")
 
 Any other value is treated as `ebnf'."
@@ -1883,7 +1883,7 @@ It's only used when `ebnf-syntax' is `iso-ebnf'."
   :group 'ebnf-syntactic)
 
 
-(defcustom ebnf-file-suffix-regexp "\\.[Bb][Nn][Ff]$"
+(defcustom ebnf-file-suffix-regexp "\\.[Bb][Nn][Ff]\\'"
   "Specify file name suffix that contains EBNF.
 
 See `ebnf-eps-directory' command."
@@ -2715,7 +2715,7 @@ Used in functions `ebnf-reset-style', `ebnf-push-style' and
       (ebnf-syntax                      . 'ebnf)
       (ebnf-iso-alternative-p           . nil)
       (ebnf-iso-normalize-p             . nil)
-      (ebnf-file-suffix-regexp          . "\\.[Bb][Nn][Ff]$")
+      (ebnf-file-suffix-regexp          . "\\.[Bb][Nn][Ff]\\'")
       (ebnf-eps-prefix                  . "ebnf--")
       (ebnf-eps-header-font             . '(11 Helvetica "Black" "White" bold))
       (ebnf-eps-header                  . nil)
@@ -4527,7 +4527,7 @@ end
   (let* ((ebnf-tree tree)
          (ps-color-p           (and ebnf-color-p (ps-color-device)))
 	 (ps-print-color-scale (if ps-color-p
-				   (float (car (ps-color-values "white")))
+				   (float (car (color-values "white")))
 				 1.0))
 	 (ebnf-total           (length ebnf-tree))
 	 (ebnf-nprod           0)
@@ -4629,7 +4629,7 @@ end
   (let* ((ebnf-tree tree)
          (ps-color-p           (and ebnf-color-p (ps-color-device)))
 	 (ps-print-color-scale (if ps-color-p
-				   (float (car (ps-color-values "white")))
+				   (float (car (color-values "white")))
 				 1.0))
 	 ps-zebra-stripes ps-line-number ps-razzle-dazzle
 	 ps-print-hook
@@ -4975,8 +4975,6 @@ killed after process termination."
 (defun ebnf-eps-filename (str)
   (let* ((len  (length str))
 	 (stri 0)
-	 ;; to keep compatibility with Emacs 20 & 21:
-	 ;; DO NOT REPLACE `?\ ' BY `?\s'
 	 (new  (make-string len ?\ )))
     (while (< stri len)
       (aset new stri (aref ebnf-map-name (aref str stri)))
@@ -5993,8 +5991,6 @@ killed after process termination."
 (defun ebnf-trim-right (str)
   (let* ((len   (1- (length str)))
 	 (index len))
-    ;; to keep compatibility with Emacs 20 & 21:
-    ;; DO NOT REPLACE `?\ ' BY `?\s'
     (while (and (> index 0) (= (aref str index) ?\ ))
       (setq index (1- index)))
     (if (= index len)

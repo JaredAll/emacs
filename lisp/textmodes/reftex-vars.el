@@ -1,6 +1,6 @@
 ;;; reftex-vars.el --- configuration variables for RefTeX
 
-;; Copyright (C) 1997-1999, 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1997-1999, 2001-2021 Free Software Foundation, Inc.
 
 ;; Author: Carsten Dominik <dominik@science.uva.nl>
 ;; Maintainer: auctex-devel@gnu.org
@@ -741,8 +741,8 @@ The function must take an argument BOUND.  If non-nil, BOUND is a
 boundary for backwards searches which should be observed.
 
 Here is an example.  The LaTeX package linguex.sty defines list macros
-`\\ex.', `\\a.', etc for lists which are terminated by `\\z.' or an empty
-line.
+`\\ex.', `\\a.', etc for lists which are terminated by `\\z.' or an
+empty line.
 
     \\ex.  \\label{ex:12} Some text in an exotic language ...
           \\a. \\label{ex:13} more stuff
@@ -766,10 +766,12 @@ And here is the setup for RefTeX:
        (save-excursion
          ;; Search for any of the linguex item macros at the beginning of a line
          (if (re-search-backward
-              \"^[ \\t]*\\\\(\\\\\\\\\\\\(ex\\\\|a\\\\|b\\\\|c\\\\|d\\\\|e\\\\|f\\\\)g?\\\\.\\\\)\" bound t)
+              (concat \"^[ \\t]*\\\\(\\\\\\\\\\\\(ex\\\\|a\\\\|\"
+                      \"b\\\\|c\\\\|d\\\\|e\\\\|f\\\\)g?\\\\.\\\\)\")
+              bound t)
              (progn
                (setq p1 (match-beginning 1))
-               ;; Make sure no empty line or \\z. is between us and the item macro
+               ;; Make sure no empty line or \\z. is between us and item macro
                (if (re-search-forward \"\\n[ \\t]*\\n\\\\|\\\\\\\\z\\\\.\" pos t)
                    ;; Return nil because list was already closed
                    nil
@@ -898,13 +900,14 @@ DOWNCASE    t:   Downcase words before using them."
       ,(concat
         ;; Make sure we search only for optional arguments of
         ;; environments/macros and don't match any other [.  ctable
-        ;; provides a macro called \ctable, listings/breqn have
+        ;; provides a macro called \ctable, beamer/breqn/listings have
         ;; environments.  Start with a backslash and a group for names
         "\\\\\\(?:"
         ;; begin, optional spaces and opening brace
         "begin[[:space:]]*{"
         ;; Build a regexp for env names
-        (regexp-opt '("lstlisting" "dmath" "dseries" "dgroup" "darray"))
+        (regexp-opt '("lstlisting" "dmath" "dseries" "dgroup"
+                      "darray" "frame"))
         ;; closing brace, optional spaces
         "}[[:space:]]*"
         ;; Now for macros
@@ -917,9 +920,9 @@ DOWNCASE    t:   Downcase words before using them."
         "\\[[^][]*"
         ;; Allow nested levels of chars enclosed in braces
         "\\(?:{[^}{]*"
-          "\\(?:{[^}{]*"
-            "\\(?:{[^}{]*}[^}{]*\\)*"
-          "}[^}{]*\\)*"
+        "\\(?:{[^}{]*"
+        "\\(?:{[^}{]*}[^}{]*\\)*"
+        "}[^}{]*\\)*"
         "}[^][]*\\)*"
         ;; Match the label key
         "\\<label[[:space:]]*=[[:space:]]*"
@@ -933,8 +936,9 @@ The default value matches usual \\label{...} definitions and
 keyval style [..., label = {...}, ...] label definitions.  The
 regexp for keyval style explicitly looks for environments
 provided by the packages \"listings\" (\"lstlisting\"),
-\"breqn\" (\"dmath\", \"dseries\", \"dgroup\", \"darray\") and
-the macro \"\\ctable\" provided by the package of the same name.
+\"beamer\" (\"frame\"), \"breqn\" (\"dmath\", \"dseries\",
+\"dgroup\", \"darray\") and the macro \"\\ctable\" provided by
+the package of the same name.
 
 It is assumed that the regexp group 1 matches the label text, so
 you have to define it using \\(?1:...\\) when adding new regexps.
@@ -942,7 +946,7 @@ you have to define it using \\(?1:...\\) when adding new regexps.
 When changed from Lisp, make sure to call
 `reftex-compile-variables' afterwards to make the change
 effective."
-    :version "27.1"
+    :version "28.1"
     :set (lambda (symbol value)
 	   (set symbol value)
 	   (when (fboundp 'reftex-compile-variables)

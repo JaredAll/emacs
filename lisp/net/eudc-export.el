@@ -1,6 +1,6 @@
 ;;; eudc-export.el --- functions to export EUDC query results
 
-;; Copyright (C) 1998-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2021 Free Software Foundation, Inc.
 
 ;; Author: Oscar Figueiredo <oscar@cpe.fr>
 ;;         Pavel Janík <Pavel@Janik.cz>
@@ -78,12 +78,11 @@ If SILENT is non-nil then the created BBDB record is not displayed."
 						 record t)))
       ;; BBDB custom fields
       (setq bbdb-notes (append (list (and bbdb-notes (cons 'notes bbdb-notes)))
-			       (mapcar (function
-					(lambda (mapping)
-					  (if (and (not (memq (car mapping)
-							      '(name company net address phone notes)))
-						   (setq value (eudc-parse-spec (cdr mapping) record nil)))
-					      (cons (car mapping) value))))
+                               (mapcar (lambda (mapping)
+                                         (if (and (not (memq (car mapping)
+                                                             '(name company net address phone notes)))
+                                                  (setq value (eudc-parse-spec (cdr mapping) record nil)))
+                                             (cons (car mapping) value)))
 				       conversion-alist)))
       (setq bbdb-notes (delq nil bbdb-notes))
       (setq bbdb-record (bbdb-create-internal

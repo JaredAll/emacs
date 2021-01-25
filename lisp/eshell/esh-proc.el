@@ -1,6 +1,6 @@
 ;;; esh-proc.el --- process management  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1999-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2021 Free Software Foundation, Inc.
 
 ;; Author: John Wiegley <johnw@gnu.org>
 
@@ -215,9 +215,8 @@ and signal names."
 The prompt will be set to PROMPT."
   (completing-read prompt
 		   (mapcar
-		    (function
-		     (lambda (proc)
-		       (cons (process-name proc) t)))
+                    (lambda (proc)
+                      (cons (process-name proc) t))
 		    (process-list))
                    nil t))
 
@@ -295,7 +294,7 @@ See `eshell-needs-pipe'."
 	 (process-environment (eshell-environment-variables))
 	 proc decoding encoding changed)
     (cond
-     ((fboundp 'start-file-process)
+     ((fboundp 'make-process)
       (setq proc
 	    (let ((process-connection-type
 		   (unless (eshell-needs-pipe-p command)
@@ -499,9 +498,8 @@ See the variable `eshell-kill-processes-on-exit'."
   (let ((sigs eshell-kill-process-signals))
     (while sigs
       (eshell-process-interact
-       (function
-	(lambda (proc)
-	  (signal-process (process-id proc) (car sigs)))) t query)
+       (lambda (proc)
+         (signal-process (process-id proc) (car sigs))) t query)
       (setq query nil)
       (if (not eshell-process-list)
 	  (setq sigs nil)

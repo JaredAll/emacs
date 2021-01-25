@@ -1,6 +1,6 @@
 ;;; gametree.el --- manage game analysis trees in Emacs
 
-;; Copyright (C) 1997, 1999, 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 1999, 2001-2021 Free Software Foundation, Inc.
 
 ;; Author: Ian T Zimmerman <itz@rahul.net>
 ;; Created: Wed Dec 10 07:41:46 PST 1997
@@ -121,8 +121,8 @@ Has to contain \"%d\" to output the actual number."
   :group 'gametree)
 
 (defcustom gametree-make-heading-function
-  (function (lambda (level)
-              (insert (make-string level ?*))))
+  (lambda (level)
+    (insert (make-string level ?*)))
   "A function of one numeric argument, LEVEL, to insert a heading at point.
 You should change this if you change `outline-regexp'."
   :type 'function

@@ -1,6 +1,6 @@
 ;;; semantic/decorate/mode.el --- Minor mode for decorating tags
 
-;; Copyright (C) 2000-2005, 2007-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2005, 2007-2021 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: syntax
@@ -203,9 +203,6 @@ Also make sure old decorations in the area are completely flushed."
 ;; time of the state change, minimal work would be done.
 (defvar semantic-decorate-pending-decoration-hook nil
   "Normal hook run to perform pending decoration changes.")
-
-(semantic-varalias-obsolete 'semantic-decorate-pending-decoration-hooks
-			    'semantic-decorate-pending-decoration-hook "23.2")
 
 (defun semantic-decorate-add-pending-decoration (fcn &optional buffer)
   "Add a pending decoration change represented by FCN.

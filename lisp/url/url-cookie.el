@@ -1,6 +1,6 @@
 ;;; url-cookie.el --- URL cookie support  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1996-1999, 2004-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1996-1999, 2004-2021 Free Software Foundation, Inc.
 
 ;; Keywords: comm, data, processes, hypermedia
 
@@ -162,7 +162,7 @@ i.e. 1970-1-1) are loaded as expiring one year from now instead."
               ";; version-control: never\n"
               ";; no-byte-compile: t\n"
               ";; End:\n")
-      (set (make-local-variable 'version-control) 'never)
+      (setq-local version-control 'never)
       (write-file fname))
     (setq url-cookies-changed-since-last-save nil))))
 
@@ -319,7 +319,7 @@ i.e. 1970-1-1) are loaded as expiring one year from now instead."
 	(pop untrusted)))
     (and trusted untrusted
 	 ;; Choose the more specific match.
-	 (set (if (> trusted untrusted) 'untrusted 'trusted) nil))
+	 (if (> trusted untrusted) (setq untrusted nil) (setq trusted nil)))
     (cond
      (untrusted
       ;; The site was explicitly marked as untrusted by the user.

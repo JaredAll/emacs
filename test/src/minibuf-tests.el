@@ -1,6 +1,6 @@
 ;;; minibuf-tests.el --- tests for minibuf.c functions -*- lexical-binding: t -*-
 
-;; Copyright (C) 2016-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2016-2021 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -409,6 +409,21 @@
     (should (equal (try-completion "baz" '("baz" "bAz")) "baz")) ;And not `t'!
     (should (equal (try-completion "baz" '("bAz" "baz"))
                    (try-completion "baz" '("baz" "bAz"))))))
+
+(ert-deftest test-inhibit-interaction ()
+  (let ((inhibit-interaction t))
+    (should-error (read-from-minibuffer "foo: "))
+
+    (should-error (y-or-n-p "foo: "))
+    (should-error (yes-or-no-p "foo: "))
+    (should-error (read-blanks-no-input "foo: "))
+
+    ;; See that we get the expected error.
+    (should (eq (condition-case nil
+                    (read-from-minibuffer "foo: ")
+                  (inhibited-interaction 'inhibit)
+                  (error nil))
+                'inhibit))))
 
 
 ;;; minibuf-tests.el ends here

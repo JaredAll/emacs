@@ -1,6 +1,6 @@
 ;;; cc-cmds.el --- user level commands for CC Mode
 
-;; Copyright (C) 1985, 1987, 1992-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1985, 1987, 1992-2021 Free Software Foundation, Inc.
 
 ;; Authors:    2003- Alan Mackenzie
 ;;             1998- Martin Stjernholm
@@ -907,7 +907,6 @@ settings of `c-cleanup-list' are done."
     (when (and (boundp 'electric-pair-mode)
 	       electric-pair-mode)
       (let ((size (buffer-size))
-	    (c-in-electric-pair-functionality t)
 	    post-self-insert-hook)
 	(electric-pair-post-self-insert-function)
 	(setq got-pair-} (and at-eol
@@ -1554,19 +1553,6 @@ left out."
 (declare-function c-backward-subword "ext:cc-subword" (&optional arg))
 
 ;; "nomenclature" functions + c-scope-operator.
-(defun c-forward-into-nomenclature (&optional arg)
-  "Compatibility alias for `c-forward-subword'."
-  (interactive "p")
-  (if (fboundp 'subword-mode)
-      (progn
-        (require 'subword)
-        (subword-forward arg))
-    (require 'cc-subword)
-    (c-forward-subword arg)))
-(make-obsolete 'c-forward-into-nomenclature
-               (if (fboundp 'subword-mode) 'subword-forward 'c-forward-subword)
-               "23.2")
-
 (defun c-backward-into-nomenclature (&optional arg)
   "Compatibility alias for `c-backward-subword'."
   (interactive "p")
@@ -2340,7 +2326,7 @@ with a brace block, at the outermost level of nesting."
 	(c-save-buffer-state ((paren-state (c-parse-state))
 			      (orig-point-min (point-min))
 			      (orig-point-max (point-max))
-			      lim name where limits fdoc)
+			      lim name limits where)
 	  (setq lim (c-widen-to-enclosing-decl-scope
 		     paren-state orig-point-min orig-point-max))
 	  (and lim (setq lim (1- lim)))
@@ -2371,7 +2357,7 @@ With a prefix arg, push the name onto the kill ring too."
 (put 'c-display-defun-name 'isearch-scroll t)
 
 (defun c-mark-function ()
-  "Put mark at end of the current top-level declaration or macro, point at beginning.
+  "Put mark at end of current top-level declaration or macro, point at beginning.
 If point is not inside any then the closest following one is
 chosen.  Each successive call of this command extends the marked
 region by one function.

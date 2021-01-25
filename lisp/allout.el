@@ -1,6 +1,6 @@
 ;;; allout.el --- extensive outline mode for use alone and with other modes
 
-;; Copyright (C) 1992-1994, 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1992-1994, 2001-2021 Free Software Foundation, Inc.
 
 ;; Author: Ken Manheimer <ken dot manheimer at gmail...>
 ;; Created: Dec 1991 -- first release to usenet
@@ -62,8 +62,7 @@
 ;; The outline menubar additions provide quick reference to many of the
 ;; features.  See the docstring of the variables `allout-layout' and
 ;; `allout-auto-activation' for details on automatic activation of
-;; `allout-mode' as a minor mode.  (`allout-init' is deprecated in favor of
-;; a purely customization-based method.)
+;; `allout-mode' as a minor mode.
 ;;
 ;; Note -- the lines beginning with `;;;_' are outline topic headers.
 ;;        Customize `allout-auto-activation' to enable, then revisit this
@@ -78,7 +77,6 @@
 
 ;;;_* Dependency loads
 (require 'overlay)
-(eval-when-compile (require 'cl-lib))
 
 ;;;_* USER CUSTOMIZATION VARIABLES:
 
@@ -247,7 +245,7 @@ prevails."
   "Allout-mode functions bound to keys without any added prefix.
 
 This is in contrast to the majority of allout-mode bindings on
-`allout-prefixed-bindings', whose bindings are created with a
+`allout-prefixed-keybindings', whose bindings are created with a
 preceding command key.
 
 Use vector format for the keys:
@@ -410,8 +408,7 @@ where auto-fill occurs."
   :group 'allout)
 (make-variable-buffer-local 'allout-use-hanging-indents)
 ;;;###autoload
-(put 'allout-use-hanging-indents 'safe-local-variable
-     (if (fboundp 'booleanp) 'booleanp (lambda (x) (member x '(t nil)))))
+(put 'allout-use-hanging-indents 'safe-local-variable 'booleanp)
 ;;;_  = allout-reindent-bodies
 (defcustom allout-reindent-bodies (if allout-use-hanging-indents
 				    'text)
@@ -440,8 +437,7 @@ just the header."
   :group 'allout)
 (make-variable-buffer-local 'allout-show-bodies)
 ;;;###autoload
-(put 'allout-show-bodies 'safe-local-variable
-     (if (fboundp 'booleanp) 'booleanp (lambda (x) (member x '(t nil)))))
+(put 'allout-show-bodies 'safe-local-variable 'booleanp)
 
 ;;;_  = allout-beginning-of-line-cycles
 (defcustom allout-beginning-of-line-cycles t
@@ -662,8 +658,7 @@ are always respected by the topic maneuvering functions."
   :group 'allout)
 (make-variable-buffer-local 'allout-old-style-prefixes)
 ;;;###autoload
-(put 'allout-old-style-prefixes 'safe-local-variable
-     (if (fboundp 'booleanp) 'booleanp (lambda (x) (member x '(t nil)))))
+(put 'allout-old-style-prefixes 'safe-local-variable 'booleanp)
 ;;;_  = allout-stylish-prefixes -- alternating bullets
 (defcustom allout-stylish-prefixes t
   "Do fancy stuff with topic prefix bullets according to level, etc.
@@ -711,8 +706,7 @@ is non-nil."
   :group 'allout)
 (make-variable-buffer-local 'allout-stylish-prefixes)
 ;;;###autoload
-(put 'allout-stylish-prefixes 'safe-local-variable
-     (if (fboundp 'booleanp) 'booleanp (lambda (x) (member x '(t nil)))))
+(put 'allout-stylish-prefixes 'safe-local-variable 'booleanp)
 
 ;;;_  = allout-numbered-bullet
 (defcustom allout-numbered-bullet "#"
@@ -726,10 +720,7 @@ disables numbering maintenance."
   :group 'allout)
 (make-variable-buffer-local 'allout-numbered-bullet)
 ;;;###autoload
-(put 'allout-numbered-bullet 'safe-local-variable
-     (if (fboundp 'string-or-null-p)
-         'string-or-null-p
-       (lambda (x) (or (stringp x) (null x)))))
+(put 'allout-numbered-bullet 'safe-local-variable 'string-or-null-p)
 ;;;_  = allout-file-xref-bullet
 (defcustom allout-file-xref-bullet "@"
   "Bullet signifying file cross-references, for `allout-resolve-xref'.
@@ -738,10 +729,7 @@ Set this var to the bullet you want to use for file cross-references."
   :type '(choice (const nil) string)
   :group 'allout)
 ;;;###autoload
-(put 'allout-file-xref-bullet 'safe-local-variable
-     (if (fboundp 'string-or-null-p)
-         'string-or-null-p
-       (lambda (x) (or (stringp x) (null x)))))
+(put 'allout-file-xref-bullet 'safe-local-variable 'string-or-null-p)
 ;;;_  = allout-presentation-padding
 (defcustom allout-presentation-padding 2
   "Presentation-format white-space padding factor, for greater indent."
@@ -851,20 +839,6 @@ for restoring when all encryptions are established.")
 (defgroup allout-developer nil
   "Allout settings developers care about, including topic encryption and more."
   :group 'allout)
-;;;_  = allout-run-unit-tests-on-load
-(defcustom allout-run-unit-tests-on-load nil
-  "When non-nil, unit tests will be run at end of loading the allout module.
-
-Generally, allout code developers are the only ones who'll want to set this.
-
-\(If set, this makes it an even better practice to exercise changes by
-doing byte-compilation with a repeat count, so the file is loaded after
-compilation.)
-
-See `allout-run-unit-tests' to see what's run."
-  :type 'boolean
-  :group 'allout-developer)
-
 ;;;_ + Miscellaneous customization
 
 ;;;_  = allout-enable-file-variable-adjustment
@@ -1536,7 +1510,7 @@ topic prefix.
 Entries must be symbols that are bound to the desired regexp values.
 
 Encryptions that result in matches will be retried, up to
-`allout-encryption-ciphertext-rejection-limit' times, after which
+`allout-encryption-ciphertext-rejection-ceiling' times, after which
 an error is raised.")
 
 (make-variable-buffer-local 'allout-encryption-ciphertext-rejection-regexps)
@@ -1637,18 +1611,6 @@ non-nil in a lasting way.")
   "If t, `allout-mode's last deactivation was deliberate.
 So `allout-post-command-business' should not reactivate it...")
 (make-variable-buffer-local 'allout-explicitly-deactivated)
-;;;_  > allout-init (mode)
-(defun allout-init (mode)
-  "DEPRECATED - configure allout activation by customizing
-`allout-auto-activation'.  This function remains around, limited
-from what it did before, for backwards compatibility.
-
-MODE is the activation mode - see `allout-auto-activation' for
-valid values."
-  (declare (obsolete allout-auto-activation "23.3"))
-  (customize-set-variable 'allout-auto-activation (format "%s" mode))
-  (format "%s" mode))
-
 ;;;_  > allout-setup-menubar ()
 (defun allout-setup-menubar ()
   "Populate the current buffer's menubar with `allout-mode' stuff."
@@ -1659,8 +1621,7 @@ valid values."
 	cur)
     (while menus
       (setq cur (car menus)
-	    menus (cdr menus))
-      (easy-menu-add cur))))
+            menus (cdr menus)))))
 ;;;_  > allout-overlay-preparations
 (defun allout-overlay-preparations ()
   "Set the properties of the allout invisible-text overlay and others."
@@ -2484,20 +2445,16 @@ Outermost is first."
              (allout-back-to-current-heading)
              (allout-end-of-current-line))
             (t
-             (if (not (allout-mark-active-p))
+             (if (not mark-active)
                  (push-mark))
              (allout-end-of-entry))))))
+
 ;;;_   > allout-mark-active-p ()
 (defun allout-mark-active-p ()
   "True if the mark is currently or always active."
-  ;; `(cond (boundp...))' (or `(if ...)') invokes special byte-compiler
-  ;; provisions, at least in GNU Emacs to prevent warnings about lack of,
-  ;; eg, region-active-p.
-  (cond ((boundp 'mark-active)
-         mark-active)
-        ((fboundp 'region-active-p)
-         (region-active-p))
-        (t)))
+  (declare (obsolete nil "28.1"))
+  mark-active)
+
 ;;;_   > allout-next-heading ()
 (defsubst allout-next-heading ()
   "Move to the heading for the topic (possibly invisible) after this one.
@@ -4763,7 +4720,7 @@ this function."
 
 This is a way to give restricted peek at a concealed locality without the
 expense of exposing its context, but can leave the outline with aberrant
-exposure.  `allout-show-offshoot' should be used after the peek to rectify
+exposure.  `allout-show-to-offshoot' should be used after the peek to rectify
 the exposure."
 
   (interactive)
@@ -5452,11 +5409,9 @@ header and body.  The elements of that list are:
 				 (cdr format)))))))
       ;; Put the list with first at front, to last at back:
       (nreverse result))))
-;;;_   > allout-region-active-p ()
-(defmacro allout-region-active-p ()
-  (cond ((fboundp 'use-region-p) '(use-region-p))
-        ((fboundp 'region-active-p) '(region-active-p))
-        (t 'mark-active)))
+
+(define-obsolete-function-alias 'allout-region-active-p 'region-active-p "28.1")
+
 ;;_   > allout-process-exposed (&optional func from to frombuf
 ;;;					    tobuf format)
 (defun allout-process-exposed (&optional func from to frombuf tobuf
@@ -5489,7 +5444,7 @@ Defaults:
 					; defaulting if necessary:
   (if (not func) (setq func 'allout-insert-listified))
   (if (not (and from to))
-      (if (allout-region-active-p)
+      (if (region-active-p)
 	  (setq from (region-beginning) to (region-end))
 	(setq from (point-min) to (point-max))))
   (if frombuf
@@ -5627,12 +5582,11 @@ used verbatim."
   "Return copy of STRING for literal reproduction across LaTeX processing.
 Expresses the original characters (including carriage returns) of the
 string across LaTeX processing."
-  (mapconcat (function
-	      (lambda (char)
-		(cond ((memq char '(?\\ ?$ ?% ?# ?& ?{ ?} ?_ ?^ ?- ?*))
-		       (concat "\\char" (number-to-string char) "{}"))
-		      ((= char ?\n) "\\\\")
-		      (t (char-to-string char)))))
+  (mapconcat (lambda (char)
+               (cond ((memq char '(?\\ ?$ ?% ?# ?& ?{ ?} ?_ ?^ ?- ?*))
+                      (concat "\\char" (number-to-string char) "{}"))
+                     ((= char ?\n) "\\\\")
+                     (t (char-to-string char))))
 	     string
 	     ""))
 ;;;_   > allout-latex-verbatim-quote-curr-line ()
@@ -6547,136 +6501,7 @@ If BEG is bigger than END we return 0."
     (isearch-repeat 'forward)
     (isearch-mode t)))
 
-;;;_ #11 Unit tests -- this should be last item before "Provide"
-;;;_  > allout-run-unit-tests ()
-(defun allout-run-unit-tests ()
-  "Run the various allout unit tests."
-  (message "Running allout tests...")
-  (allout-test-resumptions)
-  (message "Running allout tests...  Done.")
-  (sit-for .5))
-;;;_  : test resumptions:
-;;;_   > allout-tests-obliterate-variable (name)
-(defun allout-tests-obliterate-variable (name)
-  "Completely unbind variable with NAME."
-  (if (local-variable-p name (current-buffer)) (kill-local-variable name))
-  (while (boundp name) (makunbound name)))
-;;;_   > allout-test-resumptions ()
-(defvar allout-tests-globally-unbound nil
-  "Fodder for allout resumptions tests -- defvar just for byte compiler.")
-(defvar allout-tests-globally-true nil
-  "Fodder for allout resumptions tests -- defvar just for byte compiler.")
-(defvar allout-tests-locally-true nil
-  "Fodder for allout resumptions tests -- defvar just for byte compiler.")
-(defun allout-test-resumptions ()
-  ;; FIXME: Use ERT.
-  "Exercise allout resumptions."
-  ;; for each resumption case, we also test that the right local/global
-  ;; scopes are affected during resumption effects:
-
-  ;; ensure that previously unbound variables return to the unbound state.
-  (with-temp-buffer
-    (allout-tests-obliterate-variable 'allout-tests-globally-unbound)
-    (allout-add-resumptions '(allout-tests-globally-unbound t))
-    (cl-assert (not (default-boundp 'allout-tests-globally-unbound)))
-    (cl-assert (local-variable-p 'allout-tests-globally-unbound (current-buffer)))
-    (cl-assert (boundp 'allout-tests-globally-unbound))
-    (cl-assert (equal allout-tests-globally-unbound t))
-    (allout-do-resumptions)
-    (cl-assert (not (local-variable-p 'allout-tests-globally-unbound
-                                   (current-buffer))))
-    (cl-assert (not (boundp 'allout-tests-globally-unbound))))
-
-  ;; ensure that variable with prior global value is resumed
-  (with-temp-buffer
-    (allout-tests-obliterate-variable 'allout-tests-globally-true)
-    (setq allout-tests-globally-true t)
-    (allout-add-resumptions '(allout-tests-globally-true nil))
-    (cl-assert (equal (default-value 'allout-tests-globally-true) t))
-    (cl-assert (local-variable-p 'allout-tests-globally-true (current-buffer)))
-    (cl-assert (equal allout-tests-globally-true nil))
-    (allout-do-resumptions)
-    (cl-assert (not (local-variable-p 'allout-tests-globally-true
-                                   (current-buffer))))
-    (cl-assert (boundp 'allout-tests-globally-true))
-    (cl-assert (equal allout-tests-globally-true t)))
-
-  ;; ensure that prior local value is resumed
-  (with-temp-buffer
-    (allout-tests-obliterate-variable 'allout-tests-locally-true)
-    (set (make-local-variable 'allout-tests-locally-true) t)
-    (cl-assert (not (default-boundp 'allout-tests-locally-true))
-            nil (concat "Test setup mistake -- variable supposed to"
-                        " not have global binding, but it does."))
-    (cl-assert (local-variable-p 'allout-tests-locally-true (current-buffer))
-            nil (concat "Test setup mistake -- variable supposed to have"
-                        " local binding, but it lacks one."))
-    (allout-add-resumptions '(allout-tests-locally-true nil))
-    (cl-assert (not (default-boundp 'allout-tests-locally-true)))
-    (cl-assert (local-variable-p 'allout-tests-locally-true (current-buffer)))
-    (cl-assert (equal allout-tests-locally-true nil))
-    (allout-do-resumptions)
-    (cl-assert (boundp 'allout-tests-locally-true))
-    (cl-assert (local-variable-p 'allout-tests-locally-true (current-buffer)))
-    (cl-assert (equal allout-tests-locally-true t))
-    (cl-assert (not (default-boundp 'allout-tests-locally-true))))
-
-  ;; ensure that last of multiple resumptions holds, for various scopes.
-  (with-temp-buffer
-    (allout-tests-obliterate-variable 'allout-tests-globally-unbound)
-    (allout-tests-obliterate-variable 'allout-tests-globally-true)
-    (setq allout-tests-globally-true t)
-    (allout-tests-obliterate-variable 'allout-tests-locally-true)
-    (set (make-local-variable 'allout-tests-locally-true) t)
-    (allout-add-resumptions '(allout-tests-globally-unbound t)
-                            '(allout-tests-globally-true nil)
-                            '(allout-tests-locally-true nil))
-    (allout-add-resumptions '(allout-tests-globally-unbound 2)
-                            '(allout-tests-globally-true 3)
-                            '(allout-tests-locally-true 4))
-    ;; reestablish many of the basic conditions are maintained after re-add:
-    (cl-assert (not (default-boundp 'allout-tests-globally-unbound)))
-    (cl-assert (local-variable-p 'allout-tests-globally-unbound (current-buffer)))
-    (cl-assert (equal allout-tests-globally-unbound 2))
-    (cl-assert (default-boundp 'allout-tests-globally-true))
-    (cl-assert (local-variable-p 'allout-tests-globally-true (current-buffer)))
-    (cl-assert (equal allout-tests-globally-true 3))
-    (cl-assert (not (default-boundp 'allout-tests-locally-true)))
-    (cl-assert (local-variable-p 'allout-tests-locally-true (current-buffer)))
-    (cl-assert (equal allout-tests-locally-true 4))
-    (allout-do-resumptions)
-    (cl-assert (not (local-variable-p 'allout-tests-globally-unbound
-                                   (current-buffer))))
-    (cl-assert (not (boundp 'allout-tests-globally-unbound)))
-    (cl-assert (not (local-variable-p 'allout-tests-globally-true
-                                   (current-buffer))))
-    (cl-assert (boundp 'allout-tests-globally-true))
-    (cl-assert (equal allout-tests-globally-true t))
-    (cl-assert (boundp 'allout-tests-locally-true))
-    (cl-assert (local-variable-p 'allout-tests-locally-true (current-buffer)))
-    (cl-assert (equal allout-tests-locally-true t))
-    (cl-assert (not (default-boundp 'allout-tests-locally-true))))
-
-  ;; ensure that deliberately unbinding registered variables doesn't foul things
-  (with-temp-buffer
-    (allout-tests-obliterate-variable 'allout-tests-globally-unbound)
-    (allout-tests-obliterate-variable 'allout-tests-globally-true)
-    (setq allout-tests-globally-true t)
-    (allout-tests-obliterate-variable 'allout-tests-locally-true)
-    (set (make-local-variable 'allout-tests-locally-true) t)
-    (allout-add-resumptions '(allout-tests-globally-unbound t)
-                            '(allout-tests-globally-true nil)
-                            '(allout-tests-locally-true nil))
-    (allout-tests-obliterate-variable 'allout-tests-globally-unbound)
-    (allout-tests-obliterate-variable 'allout-tests-globally-true)
-    (allout-tests-obliterate-variable 'allout-tests-locally-true)
-    (allout-do-resumptions))
-  )
-;;;_  % Run unit tests if `allout-run-unit-tests-after-load' is true:
-(when allout-run-unit-tests-on-load
-  (allout-run-unit-tests))
-
-;;;_ #12 Provide
+;;;_ #11 Provide
 (provide 'allout)
 
 ;;;_* Local emacs vars.

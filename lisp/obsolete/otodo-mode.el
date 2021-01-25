@@ -1,6 +1,6 @@
 ;;; todo-mode.el --- major mode for editing TODO list files
 
-;; Copyright (C) 1997, 1999, 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 1999, 2001-2021 Free Software Foundation, Inc.
 
 ;; Author: Oliver Seidel <privat@os10000.net>
 ;; Maintainer: Stephen Berman <stephen.berman@gmx.net>
@@ -923,7 +923,8 @@ If INCLUDE-SEP is non-nil, return point after the separator."
 ;;;###autoload
 (define-derived-mode todo-mode nil "TODO"
   "Major mode for editing TODO lists."
-  (easy-menu-add todo-menu))
+  (when (featurep 'xemacs)
+    (easy-menu-add todo-menu)))
 
 (with-suppressed-warnings ((lexical date entry))
   (defvar date)

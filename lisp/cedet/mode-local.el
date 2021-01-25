@@ -1,6 +1,6 @@
 ;;; mode-local.el --- Support for mode local facilities  -*- lexical-binding:t -*-
 ;;
-;; Copyright (C) 2004-2005, 2007-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2005, 2007-2021 Free Software Foundation, Inc.
 ;;
 ;; Author: David Ponce <david@dponce.com>
 ;; Created: 27 Apr 2004
@@ -314,7 +314,7 @@ Elements are (SYMBOL . PREVIOUS-VALUE), describing one variable."
     ;; Do the normal thing.
     (let (modes table old-locals)
       (unless mode
-	(set (make-local-variable 'mode-local--init-mode) major-mode)
+        (setq-local mode-local--init-mode major-mode)
 	(setq mode major-mode))
       ;; Get MODE's parents & MODE in the right order.
       (while mode

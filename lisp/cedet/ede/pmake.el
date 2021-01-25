@@ -1,6 +1,6 @@
 ;;; ede-pmake.el --- EDE Generic Project Makefile code generator.
 
-;; Copyright (C) 1998-2005, 2007-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2005, 2007-2021 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: project, make
@@ -180,7 +180,7 @@ MFILENAME is the makefile to generate."
 	  ;;
 	  ;; NOTE: This is GNU Make specific.
 	  (if (and (oref this automatic-dependencies) df)
-	      (insert "DEPS_MAGIC := $(shell mkdir .deps > /dev/null "
+	      (insert "DEPS_MAGIC := $(shell mkdir .deps > " null-device " "
 		      "2>&1 || :)\n"
 		      "-include $(DEP_FILES)\n\n"))
 	  ;;

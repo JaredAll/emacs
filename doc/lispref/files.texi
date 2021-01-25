@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990--1995, 1998--1999, 2001--2020 Free Software
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2021 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Files
@@ -548,7 +548,7 @@ the functions in the list @code{after-insert-file-functions}.
 (@pxref{Coding Systems}) used for decoding the file's contents,
 including end-of-line conversion.  However, if the file contains null
 bytes, it is by default visited without any code conversions.
-@xref{Lisp and Coding Systems, inhibit-nul-byte-detection}.
+@xref{Lisp and Coding Systems, inhibit-null-byte-detection}.
 
 If @var{visit} is non-@code{nil}, this function additionally marks the
 buffer as unmodified and sets up various fields in the buffer so that it
@@ -701,8 +701,11 @@ in @var{body}.
 The current buffer is restored even in case of an abnormal exit via
 @code{throw} or error (@pxref{Nonlocal Exits}).
 
-See also @code{with-temp-buffer} in @ref{Definition of
-with-temp-buffer,, The Current Buffer}.
+Like @code{with-temp-buffer} (@pxref{Definition of with-temp-buffer,,
+Current Buffer}), the temporary buffer used by this macro does not run
+the hooks @code{kill-buffer-hook}, @code{kill-buffer-query-functions}
+(@pxref{Killing Buffers}), and @code{buffer-list-update-hook}
+(@pxref{Buffer List}).
 @end defmac
 
 @node File Locks
@@ -1197,7 +1200,7 @@ inconclusive, the function returns @code{t} on Cygwin and @code{nil}
 on macOS.
 
 Currently this function always returns @code{nil} on platforms other
-than MS-DOS, MS-Windows, Cygwin, and macOS.  It does not detect
+than MS-DOS, MS-Windows, Cygwin, and macOS@.  It does not detect
 case-insensitivity of mounted filesystems, such as Samba shares or
 NFS-mounted Windows volumes.  On remote hosts, it assumes @code{t} for
 the @samp{smb} method.  For all other connection methods, runtime
@@ -1907,6 +1910,11 @@ specification is based on an existing file, that file's mode bits are
 taken from the optional argument @var{base-modes}; if that argument is
 omitted or @code{nil}, it defaults to 0, i.e., no access rights at
 all.
+@end defun
+
+@defun file-modes-number-to-symbolic modes
+This function converts a numeric file mode specification in
+@var{modes} into the equivalent symbolic form.
 @end defun
 
 @defun set-file-times filename &optional time flag
@@ -2912,7 +2920,7 @@ or display the names in a buffer using the @code{ls} shell command.  In
 the latter case, it can optionally display information about each file,
 depending on the options passed to the @code{ls} command.
 
-@defun directory-files directory &optional full-name match-regexp nosort
+@defun directory-files directory &optional full-name match-regexp nosort count
 This function returns a list of the names of the files in the directory
 @var{directory}.  By default, the list is in alphabetical order.
 
@@ -2921,16 +2929,20 @@ absolute file names.  Otherwise, it returns the names relative to
 the specified directory.
 
 If @var{match-regexp} is non-@code{nil}, this function returns only
-those file names that contain a match for that regular expression---the
-other file names are excluded from the list.  On case-insensitive
-filesystems, the regular expression matching is case-insensitive.
+those file names whose non-directory part contain a match for that
+regular expression---the other file names are excluded from the list.
+On case-insensitive filesystems, the regular expression matching is
+case-insensitive.
 
-@c Emacs 19 feature
 If @var{nosort} is non-@code{nil}, @code{directory-files} does not sort
 the list, so you get the file names in no particular order.  Use this if
 you want the utmost possible speed and don't care what order the files
 are processed in.  If the order of processing is visible to the user,
 then the user will probably be happier if you do sort the names.
+
+If @var{count} is non-@code{nil}, the function will return names of
+first @var{count} number of files, or names of all files, whichever
+occurs first.  @var{count} has to be an integer greater than zero.
 
 @example
 @group
@@ -2943,6 +2955,16 @@ then the user will probably be happier if you do sort the names.
 
 An error is signaled if @var{directory} is not the name of a directory
 that can be read.
+@end defun
+
+@defun directory-empty-p directory
+This utility function returns @code{t} if given @var{directory} is an
+accessible directory and it does not contain any files, i.e., is an
+empty directory.  It will ignore @samp{.} and @samp{..} on systems
+that return them as files in a directory.
+
+Symbolic links to directories count as directories.
+See @var{file-symlink-p} to distinguish symlinks.
 @end defun
 
 @cindex recursive traverse of directory tree
@@ -2991,7 +3013,7 @@ is called with one argument (the file or directory) and should return
 non-@code{nil} if that directory is the one it is looking for.
 @end defun
 
-@defun directory-files-and-attributes directory &optional full-name match-regexp nosort id-format
+@defun directory-files-and-attributes directory &optional full-name match-regexp nosort id-format count
 This is similar to @code{directory-files} in deciding which files
 to report on and how to report their names.  However, instead
 of returning a list of file names, it returns for each file a
@@ -3001,6 +3023,19 @@ The optional argument @var{id-format} has the same meaning as the
 corresponding argument to @code{file-attributes} (@pxref{Definition
 of file-attributes}).
 @end defun
+
+@defvr Constant directory-files-no-dot-files-regexp
+This regular expression matches any file name except @samp{.} and
+@samp{..}.  More precisely, it matches parts of any nonempty string
+except those two.  It is useful as the @var{match-regexp} argument to
+@code{directory-files} and @code{directory-files-and-attributes}:
+
+@example
+(directory-files "/foo" nil directory-files-no-dot-files-regexp)
+@end example
+
+returns @code{nil}, if directory @samp{/foo} is empty.
+@end defvr
 
 @defun file-expand-wildcards pattern &optional full
 This function expands the wildcard pattern @var{pattern}, returning
@@ -3361,6 +3396,7 @@ each have handlers.
 file---such as the ones that implement completion of host names for
 remote file names---should have a non-@code{nil} @code{safe-magic}
 property.  For instance, Emacs normally protects directory names
+@c FIXME I don't think this means the PATH environment variable?
 it finds in @code{PATH} from becoming magic, if they look like magic
 file names, by prefixing them with @samp{/:}.  But if the handler that
 would be used for them has a non-@code{nil} @code{safe-magic}

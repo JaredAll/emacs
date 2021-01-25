@@ -1,6 +1,6 @@
 ;;; nnrss.el --- interfacing with RSS
 
-;; Copyright (C) 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2021 Free Software Foundation, Inc.
 
 ;; Author: Shenghuo Zhu <zsh@cs.rochester.edu>
 ;; Keywords: RSS
@@ -450,7 +450,7 @@ nnrss: %s: Not valid XML %s and libxml-parse-html-region doesn't work %s"
 (defun nnrss-normalize-date (date)
   "Return a date string of DATE in the style of RFC 822 and its successors.
 This function handles the ISO 8601 date format described in
-URL `http://www.w3.org/TR/NOTE-datetime', and also the RFC 822 style
+URL `https://www.w3.org/TR/NOTE-datetime', and also the RFC 822 style
 which RSS 2.0 allows."
   (let (case-fold-search vector year month day time zone cts given)
     (cond ((null date))			; do nothing for this case

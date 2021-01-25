@@ -1,6 +1,6 @@
 ;;; complete.el --- partial completion mechanism plus other goodies
 
-;; Copyright (C) 1990-1993, 1999-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1990-1993, 1999-2021 Free Software Foundation, Inc.
 
 ;; Author: Dave Gillespie <daveg@synaptics.com>
 ;; Keywords: abbrev convenience
@@ -430,6 +430,8 @@ of `minibuffer-completion-table' and the minibuffer contents.")
   "Like `try-completion' but return STRING instead of t."
   (let ((result (try-completion string alist predicate)))
     (if (eq result t) string result)))
+
+(defvar completion-base-size)
 
 ;; TODO document MODE magic...
 (defun PC-do-completion (&optional mode beg end goto-end)

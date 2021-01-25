@@ -1,10 +1,10 @@
 ;;; sh-script.el --- shell-script editing commands for Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1993-1997, 1999, 2001-2020 Free Software Foundation,
+;; Copyright (C) 1993-1997, 1999, 2001-2021 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Daniel Pfeiffer <occitan@esperanto.org>
-;; Version: 2.0f
+;; Old-Version: 2.0f
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: languages, unix
 
@@ -386,6 +386,7 @@ name symbol."
 	?~ "_"
 	?, "_"
 	?= "."
+        ?/ "."
 	?\; "."
 	?| "."
 	?& "."
@@ -838,7 +839,7 @@ See `sh-feature'.")
          font-lock-variable-name-face))
 
     (rc sh-append es)
-    (bash sh-append sh ("\\$(\\(\\sw+\\)" (1 'sh-quoted-exec t) ))
+    (bash sh-append sh ("\\$(\\([^)\n]+\\)" (1 'sh-quoted-exec t) ))
     (sh sh-append shell
 	;; Variable names.
 	("\\$\\({#?\\)?\\([[:alpha:]_][[:alnum:]_]*\\|[-#?@!]\\)" 2
@@ -1555,7 +1556,7 @@ with your script for an edit-interpret-debug cycle."
   (sh-set-shell
    (cond ((save-excursion
             (goto-char (point-min))
-            (looking-at "#![ \t]?\\([^ \t\n]*/bin/env[ \t]\\)?\\([^ \t\n]+\\)"))
+            (looking-at auto-mode-interpreter-regexp))
           (match-string 2))
          ((not buffer-file-name) sh-shell-file)
          ;; Checks that use `buffer-file-name' follow.
@@ -2206,8 +2207,7 @@ Shell script files can cause this function be called automatically
 when the file is visited by having a `sh-shell' file-local variable
 whose value is the shell name (don't quote it)."
   (interactive (list (completing-read
-                      (format "Shell (default %s): "
-                              sh-shell-file)
+                      (format-prompt "Shell" sh-shell-file)
                       ;; This used to use interpreter-mode-alist, but that is
                       ;; no longer appropriate now that uses regexps.
                       ;; Maybe there could be a separate variable that lists
@@ -2801,12 +2801,12 @@ t means to return a list of all possible completions of STRING.
 	    (not (bolp))
 	    ?\n)
        "exit:\n"
-       "rm $tmp* >&/dev/null" > \n)
+       "rm $tmp* >&" null-device > \n)
   (es (file-name-nondirectory (buffer-file-name))
       > "local( signals = $signals sighup sigint;" \n
       > "tmp = `{ mktemp -t " str ".XXXXXX } ) {" \n
       > "catch @ e {" \n
-      > "rm $tmp^* >[2]/dev/null" \n
+      > "rm $tmp^* >[2]" null-device \n
       "throw $e" \n
       "} {" > \n
       _ \n
@@ -2816,10 +2816,10 @@ t means to return a list of all possible completions of STRING.
 	 7 "EXIT")
   (rc (file-name-nondirectory (buffer-file-name))
       > "tmp = `{ mktemp -t " str ".XXXXXX }" \n
-      "fn sigexit { rm $tmp^* >[2]/dev/null }" \n)
+      "fn sigexit { rm $tmp^* >[2]" null-device " }" \n)
   (sh (file-name-nondirectory (buffer-file-name))
       > "TMP=`mktemp -t " str ".XXXXXX`" \n
-      "trap \"rm $TMP* 2>/dev/null\" " ?0 \n))
+      "trap \"rm $TMP* 2>" null-device "\" " ?0 \n))
 
 
 
@@ -2927,8 +2927,8 @@ option followed by a colon `:' if the option accepts an argument."
 (put 'sh-assignment 'delete-selection t)
 (defun sh-assignment (arg)
   "Remember preceding identifier for future completion and do self-insert."
-  (interactive "p")
   (declare (obsolete nil "27.1"))
+  (interactive "p")
   (self-insert-command arg)
   (sh--assignment-collect))
 

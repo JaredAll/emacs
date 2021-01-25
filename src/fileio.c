@@ -1,6 +1,6 @@
 /* File IO for GNU Emacs.
 
-Copyright (C) 1985-1988, 1993-2020 Free Software Foundation, Inc.
+Copyright (C) 1985-1988, 1993-2021 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -96,7 +96,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <acl.h>
 #include <allocator.h>
 #include <careadlinkat.h>
-#include <dosname.h>
+#include <filename.h>
 #include <fsusage.h>
 #include <stat-time.h>
 #include <tempname.h>
@@ -947,6 +947,22 @@ the root directory.  */)
 	)
       {
 	default_directory = Fexpand_file_name (default_directory, Qnil);
+
+	/* The above expansion might have produced a remote file name,
+	   so give the handlers one last chance to DTRT.  This can
+	   happen when both NAME and DEFAULT-DIRECTORY arguments are
+	   relative file names, and the buffer's default-directory is
+	   remote.  */
+	handler = Ffind_file_name_handler (default_directory,
+					   Qexpand_file_name);
+	if (!NILP (handler))
+	  {
+	    handled_name = call3 (handler, Qexpand_file_name,
+				  name, default_directory);
+	    if (STRINGP (handled_name))
+	      return handled_name;
+	    error ("Invalid handler in `file-name-handler-alist'");
+	  }
       }
   }
   multibyte = STRING_MULTIBYTE (name);
@@ -1694,7 +1710,7 @@ See also the function `substitute-in-file-name'.")
 #endif
 
 /* Put into BUF the concatenation of DIR and FILE, with an intervening
-   directory separator if needed.  Return a pointer to the NUL byte
+   directory separator if needed.  Return a pointer to the null byte
    at the end of the concatenated string.  */
 char *
 splice_dir_file (char *buf, char const *dir, char const *file)
@@ -2031,7 +2047,7 @@ permissions.  */)
   ptrdiff_t count = SPECPDL_INDEX ();
   Lisp_Object encoded_file, encoded_newname;
 #if HAVE_LIBSELINUX
-  security_context_t con;
+  char *con;
   int conlength = 0;
 #endif
 #ifdef WINDOWSNT
@@ -2903,6 +2919,11 @@ DEFUN ("file-directory-p", Ffile_directory_p, Sfile_directory_p, 1, 1, 0,
        doc: /* Return t if FILENAME names an existing directory.
 Return nil if FILENAME does not name a directory, or if there
 was trouble determining whether FILENAME is a directory.
+
+As a special case, this function will also return t if FILENAME is the
+empty string (\"\").  This quirk is due to Emacs interpreting the
+empty string (in some cases) as the current directory.
+
 Symbolic links to directories count as directories.
 See `file-symlink-p' to distinguish symlinks.  */)
   (Lisp_Object filename)
@@ -3029,7 +3050,6 @@ file_accessible_directory_p (Lisp_Object file)
   ptrdiff_t len = SBYTES (file);
   char const *dir;
   bool ok;
-  int saved_errno;
   USE_SAFE_ALLOCA;
 
   /* Normally a file "FOO" is an accessible directory if "FOO/." exists.
@@ -3054,9 +3074,7 @@ file_accessible_directory_p (Lisp_Object file)
     }
 
   ok = file_access_p (dir, F_OK);
-  saved_errno = errno;
   SAFE_FREE ();
-  errno = saved_errno;
   return ok;
 #endif	/* !DOS_NT */
 }
@@ -3118,7 +3136,7 @@ or if SELinux is disabled, or if Emacs lacks SELinux support.  */)
 #if HAVE_LIBSELINUX
   if (is_selinux_enabled ())
     {
-      security_context_t con;
+      char *con;
       int conlength = lgetfilecon (SSDATA (ENCODE_FILE (absname)), &con);
       if (conlength > 0)
 	{
@@ -3163,7 +3181,7 @@ or if Emacs was not compiled with SELinux support.  */)
   Lisp_Object role = CAR_SAFE (CDR_SAFE (context));
   Lisp_Object type = CAR_SAFE (CDR_SAFE (CDR_SAFE (context)));
   Lisp_Object range = CAR_SAFE (CDR_SAFE (CDR_SAFE (CDR_SAFE (context))));
-  security_context_t con;
+  char *con;
   bool fail;
   int conlength;
   context_t parsed_con;
@@ -3736,9 +3754,10 @@ characters in the buffer.  If VISIT is non-nil, BEG and END must be nil.
 If optional fifth argument REPLACE is non-nil, replace the current
 buffer contents (in the accessible portion) with the file contents.
 This is better than simply deleting and inserting the whole thing
-because (1) it preserves some marker positions and (2) it puts less data
-in the undo list.  When REPLACE is non-nil, the second return value is
-the number of characters that replace previous buffer contents.
+because (1) it preserves some marker positions (in unchanged portions
+at the start and end of the buffer) and (2) it puts less data in the
+undo list.  When REPLACE is non-nil, the second return value is the
+number of characters that replace previous buffer contents.
 
 This function does code conversion according to the value of
 `coding-system-for-read' or `file-coding-system-alist', and sets the
@@ -3982,7 +4001,7 @@ by calling `format-decode', which see.  */)
 
 		  record_unwind_current_buffer ();
 
-		  workbuf = Fget_buffer_create (name);
+		  workbuf = Fget_buffer_create (name, Qt);
 		  buf = XBUFFER (workbuf);
 
 		  delete_all_overlays (buf);
@@ -5682,8 +5701,8 @@ in `current-time' or an integer flag as returned by `visited-file-modtime'.  */)
       struct timespec mtime;
       if (FIXNUMP (time_flag))
 	{
-	  CHECK_RANGED_INTEGER (time_flag, -1, 0);
-	  mtime = make_timespec (0, UNKNOWN_MODTIME_NSECS - XFIXNUM (time_flag));
+	  int flag = check_integer_range (time_flag, -1, 0);
+	  mtime = make_timespec (0, UNKNOWN_MODTIME_NSECS - flag);
 	}
       else
 	mtime = lisp_time_argument (time_flag);
@@ -5730,7 +5749,7 @@ auto_save_error (Lisp_Object error_val)
   Lisp_Object msg = CALLN (Fformat, format, BVAR (current_buffer, name),
 			   Ferror_message_string (error_val));
   call3 (intern ("display-warning"),
-         intern ("auto-save"), msg, intern ("error"));
+         intern ("auto-save"), msg, intern (":error"));
 
   return Qnil;
 }
@@ -6237,6 +6256,7 @@ syms_of_fileio (void)
   DEFSYM (Qfile_date_error, "file-date-error");
   DEFSYM (Qfile_missing, "file-missing");
   DEFSYM (Qfile_notify_error, "file-notify-error");
+  DEFSYM (Qremote_file_error, "remote-file-error");
   DEFSYM (Qexcl, "excl");
 
   DEFVAR_LISP ("file-name-coding-system", Vfile_name_coding_system,
@@ -6297,6 +6317,11 @@ behaves as if file names were encoded in `utf-8'.  */);
 	Fpurecopy (list3 (Qfile_notify_error, Qfile_error, Qerror)));
   Fput (Qfile_notify_error, Qerror_message,
 	build_pure_c_string ("File notification error"));
+
+  Fput (Qremote_file_error, Qerror_conditions,
+	Fpurecopy (list3 (Qremote_file_error, Qfile_error, Qerror)));
+  Fput (Qremote_file_error, Qerror_message,
+	build_pure_c_string ("Remote file error"));
 
   DEFVAR_LISP ("file-name-handler-alist", Vfile_name_handler_alist,
 	       doc: /* Alist of elements (REGEXP . HANDLER) for file names handled specially.

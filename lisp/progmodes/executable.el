@@ -1,6 +1,6 @@
 ;;; executable.el --- base functionality for executable interpreter scripts
 
-;; Copyright (C) 1994-1996, 2000-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1994-1996, 2000-2021 Free Software Foundation, Inc.
 
 ;; Author: Daniel Pfeiffer <occitan@esperanto.org>
 ;; Keywords: languages, unix
@@ -155,7 +155,7 @@ See `compilation-error-regexp-alist'.")
 If PROGRAM is non-nil, use that instead of \"find\"."
   ;;  Pick file to search from location we know
   (let* ((dir (file-truename data-directory))
-         (file (car (directory-files dir nil "^[^.]"))))
+         (file (car (directory-files dir nil "\\`[^.]"))))
     (with-temp-buffer
       (call-process (or program "find")
                     nil
@@ -197,7 +197,7 @@ command to find the next error.  The buffer is also in `comint-mode' and
 				      buffer-file-name))))
   (require 'compile)
   (save-some-buffers (not compilation-ask-about-save))
-  (set (make-local-variable 'executable-command) command)
+  (setq-local executable-command command)
   (let ((compilation-error-regexp-alist executable-error-regexp-alist))
     (compilation-start command t (lambda (_x) "*interpretation*"))))
 

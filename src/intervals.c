@@ -1,5 +1,5 @@
 /* Code for doing intervals.
-   Copyright (C) 1993-1995, 1997-1998, 2001-2020 Free Software
+   Copyright (C) 1993-1995, 1997-1998, 2001-2021 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -117,10 +117,11 @@ create_root_interval (Lisp_Object parent)
 /* Make the interval TARGET have exactly the properties of SOURCE.  */
 
 void
-copy_properties (register INTERVAL source, register INTERVAL target)
+copy_properties (INTERVAL source, INTERVAL target)
 {
   if (DEFAULT_INTERVAL_P (source) && DEFAULT_INTERVAL_P (target))
     return;
+  eassume (source && target);
 
   COPY_INTERVAL_CACHE (source, target);
   set_interval_plist (target, Fcopy_sequence (source->plist));
@@ -1187,7 +1188,7 @@ delete_interval (register INTERVAL i)
   register INTERVAL parent;
   ptrdiff_t amt = LENGTH (i);
 
-  eassert (amt == 0);		/* Only used on zero-length intervals now.  */
+  eassert (amt <= 0);	/* Only used on zero total-length intervals now.  */
 
   if (ROOT_INTERVAL_P (i))
     {

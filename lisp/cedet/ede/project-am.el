@@ -1,6 +1,6 @@
 ;;; project-am.el --- A project management scheme based on automake files.
 
-;; Copyright (C) 1998-2000, 2003, 2005, 2007-2020 Free Software
+;; Copyright (C) 1998-2000, 2003, 2005, 2007-2021 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
@@ -493,8 +493,7 @@ This is used when subprojects are made in named subdirectories."
 		    :file fn)))
 	(oset ampf directory (file-name-directory fn))
 	(oset ampf configureoutputfiles cof)
-	(make-local-variable 'ede-object)
-	(setq ede-object ampf)
+        (setq-local ede-object ampf)
 	;; Move the rescan after we set ede-object to prevent recursion
 	(project-rescan ampf)
 	ampf))))

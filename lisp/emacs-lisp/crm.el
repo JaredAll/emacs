@@ -1,6 +1,6 @@
 ;;; crm.el --- read multiple strings with completion
 
-;; Copyright (C) 1985-1986, 1993-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1985-1986, 1993-2021 Free Software Foundation, Inc.
 
 ;; Author: Sen Nagata <sen@eccosys.com>
 ;; Keywords: completion, minibuffer, multiple elements
@@ -269,12 +269,6 @@ with empty strings removed."
 	  (split-string input crm-separator t)))
     (remove-hook 'choose-completion-string-functions
 		 'crm--choose-completion-string)))
-
-(define-obsolete-function-alias 'crm-minibuffer-complete 'crm-complete "23.1")
-(define-obsolete-function-alias
-  'crm-minibuffer-completion-help 'crm-completion-help "23.1")
-(define-obsolete-function-alias
-  'crm-minibuffer-complete-and-exit 'crm-complete-and-exit "23.1")
 
 ;; testing and debugging
 ;; (defun crm-init-test-environ ()

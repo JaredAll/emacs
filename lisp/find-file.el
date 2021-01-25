@@ -4,7 +4,7 @@
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: c, matching, tools
 
-;; Copyright (C) 1994-1995, 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1994-1995, 2001-2021 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -109,8 +109,8 @@
 ;; file.
 
 ;; CREDITS:
-;; Many thanks go to TUSC Computer Systems Pty Ltd for providing an environ-
-;; ment that made the development of this package possible.
+;; Many thanks go to TUSC Computer Systems Pty Ltd for providing an
+;; environment that made the development of this package possible.
 ;;
 ;; Many thanks also go to all those who provided valuable feedback throughout
 ;; the development of this package:

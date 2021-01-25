@@ -1,6 +1,6 @@
 ;;; semantic/symref/grep.el --- Symref implementation using find/grep
 
-;; Copyright (C) 2008-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2021 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -167,24 +167,11 @@ This shell should support pipe redirect syntax."
     (with-current-buffer b
       (erase-buffer)
       (setq default-directory rootdir)
-
-      (if (not (fboundp 'grep-compute-defaults))
-
-	  ;; find . -type f -print0 | xargs -0 -e grep -nH -e
-	  ;; Note : I removed -e as it is not posix, nor necessary it seems.
-
-	  (let ((cmd (concat "find " (file-local-name rootdir)
-                             " -type f " filepattern " -print0 "
-			     "| xargs -0 grep -H " grepflags "-e " greppat)))
-	    ;;(message "Old command: %s" cmd)
-	    (process-file semantic-symref-grep-shell nil b nil
-                          shell-command-switch cmd)
-	    )
-	(let ((cmd (semantic-symref-grep-use-template
-                    (file-local-name rootdir) filepattern grepflags greppat)))
-	  (process-file semantic-symref-grep-shell nil b nil
-                        shell-command-switch cmd))
-	))
+      (let ((cmd (semantic-symref-grep-use-template
+                  (file-name-as-directory (file-local-name rootdir))
+                  filepattern grepflags greppat)))
+        (process-file semantic-symref-grep-shell nil b nil
+                      shell-command-switch cmd)))
     (setq ans (semantic-symref-parse-tool-output tool b))
     ;; Return the answer
     ans))

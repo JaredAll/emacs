@@ -1,6 +1,6 @@
 ;;; cvs-status.el --- major mode for browsing `cvs status' output -*- lexical-binding: t -*-
 
-;; Copyright (C) 1999-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2021 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Keywords: pcl-cvs cvs status tree vc tools
@@ -92,8 +92,8 @@
 ;;;###autoload
 (define-derived-mode cvs-status-mode fundamental-mode "CVS-Status"
   "Mode used for cvs status output."
-  (set (make-local-variable 'font-lock-defaults) cvs-status-font-lock-defaults)
-  (set (make-local-variable 'cvs-minor-wrap-function) 'cvs-status-minor-wrap))
+  (setq-local font-lock-defaults cvs-status-font-lock-defaults)
+  (setq-local cvs-minor-wrap-function #'cvs-status-minor-wrap))
 
 ;; Define cvs-status-next and cvs-status-prev
 (easy-mmode-define-navigation cvs-status cvs-status-entry-leader-re "entry")

@@ -1,6 +1,6 @@
 ;;; ses.el -- Simple Emacs Spreadsheet  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2002-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2021 Free Software Foundation, Inc.
 
 ;; Author: Jonathan Yavner <jyavner@member.fsf.org>
 ;; Maintainer: Vincent Belaïche <vincentb1@users.sourceforge.net>
@@ -378,7 +378,7 @@ area of a spreadsheet.")
 ;;  "Side-effect variables".  They are set in one function, altered in
 ;;  another as a side effect, then read back by the first, as a way of
 ;;  passing back more than one value.  These declarations are just to make
-;;  the compiler happy, and to conform to standard Emacs-Lisp practice (I
+;;  the compiler happy, and to conform to standard Emacs Lisp practice (I
 ;;  think the make-local-variable trick above is cleaner).
 ;;
 
@@ -395,7 +395,7 @@ left-justification of the result.  Set to error-signal if `ses-call-printer'
 encountered an error during printing.  Otherwise nil.")
 
 (defvar ses-start-time nil
-  "Time when current operation started.  Used by `ses-time-check' to decide
+  "Time when current operation started.  Used by `ses--time-check' to decide
 when to emit a progress message.")
 
 
@@ -430,7 +430,8 @@ when to emit a progress message.")
   local-printer-list)
 
 (defmacro ses-cell-symbol (row &optional col)
-  "From a CELL or a pair (ROW,COL), get the symbol that names the local-variable holding its value.  (0,0) => A1."
+  "Return symbol of the local-variable holding value of CELL or pair (ROW,COL).
+For example, (0,0) => A1."
   (declare (debug t))
   `(ses-cell--symbol ,(if col `(ses-get-cell ,row ,col) row)))
 (put 'ses-cell-symbol 'safe-function t)
@@ -2540,10 +2541,8 @@ cell formula was unsafe and user declined confirmation."
            (if (equal initial "\"")
                (progn
                  (if (not (stringp curval)) (setq curval nil))
-                 (read-string (if curval
-                                  (format "String Cell %s (default %s): "
-                                          ses--curcell curval)
-                                (format "String Cell %s: " ses--curcell))
+                 (read-string (format-prompt "String Cell %s"
+                                             curval ses--curcell)
                               nil 'ses-read-string-history curval))
              (read-from-minibuffer
               (format "Cell %s: " ses--curcell)
@@ -3007,9 +3006,9 @@ inserts a new row if at bottom of print area.  Repeat COUNT times."
      (list col
 	   (if current-prefix-arg
 	       (prefix-numeric-value current-prefix-arg)
-	     (read-from-minibuffer (format "Column %s width (default %d): "
-					   (ses-column-letter col)
-					   (ses-col-width col))
+	     (read-from-minibuffer (format-prompt "Column %s width"
+					          (ses-col-width col)
+					          (ses-column-letter col))
 				   nil  ; No initial contents.
 				   nil  ; No override keymap.
 				   t    ; Convert to Lisp object.
@@ -3674,7 +3673,7 @@ highlighted range in the spreadsheet."
     ;; 'rowcol' corresponding to 'ses-cell' property of symbol
     ;; 'sym'. Both must be the same.
     (unless (eq sym old-name)
-      (error "Spreadsheet is broken, both symbols %S and %S refering to cell (%d,%d)" sym old-name row col))
+      (error "Spreadsheet is broken, both symbols %S and %S referring to cell (%d,%d)" sym old-name row col))
     (if new-rowcol
         ;; the new name is of A1 type, so we test that the coordinate
         ;; inferred from new name
@@ -3687,7 +3686,7 @@ highlighted range in the spreadsheet."
       (puthash new-name rowcol ses--named-cell-hashmap))
     (push `(ses-rename-cell ,old-name ,cell) buffer-undo-list)
     (cl-pushnew rowcol ses--deferred-write :test #'equal)
-    ;; Replace name by new name in formula of cells refering to renamed cell.
+    ;; Replace name by new name in formula of cells referring to renamed cell.
     (dolist (ref (ses-cell-references cell))
       (let* ((x (ses-sym-rowcol ref))
 	     (xcell  (ses-get-cell (car x) (cdr x))))

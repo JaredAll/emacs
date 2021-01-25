@@ -1,6 +1,6 @@
 ;;; gnus-cache.el --- cache interface for Gnus
 
-;; Copyright (C) 1995-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1995-2021 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -93,6 +93,8 @@ it's not cached."
 
 (autoload 'nnml-generate-nov-databases-directory "nnml")
 (autoload 'nnvirtual-find-group-art "nnvirtual")
+(autoload 'nnselect-article-group "nnselect")
+(autoload 'nnselect-article-number  "nnselect")
 
 
 
@@ -158,8 +160,12 @@ it's not cached."
 	  (file-name-coding-system nnmail-pathname-coding-system))
       ;; If this is a virtual group, we find the real group.
       (when (gnus-virtual-group-p group)
-	(let ((result (nnvirtual-find-group-art
-		       (gnus-group-real-name group) article)))
+	(let ((result (if (gnus-nnselect-group-p group)
+			  (with-current-buffer gnus-summary-buffer
+			    (cons (nnselect-article-group article)
+				  (nnselect-article-number article)))
+			(nnvirtual-find-group-art
+			 (gnus-group-real-name group) article))))
 	  (setq group (car result)
 		number (cdr result))))
       (when (and number
@@ -186,7 +192,7 @@ it's not cached."
 		(gnus-cache-update-file-total-fetched-for group file))
 	      (setq lines-chars (nnheader-get-lines-and-char))
 	      (nnheader-remove-body)
-	      (setq headers (nnheader-parse-naked-head))
+	      (setq headers (nnheader-parse-head t))
 	      (setf (mail-header-number headers) number)
 	      (setf (mail-header-lines headers) (car lines-chars))
 	      (setf (mail-header-chars headers) (cadr lines-chars))
@@ -232,8 +238,14 @@ it's not cached."
     (let ((arts gnus-cache-removable-articles)
 	  ga)
       (while arts
-	(when (setq ga (nnvirtual-find-group-art
-			(gnus-group-real-name gnus-newsgroup-name) (pop arts)))
+	(when (setq ga
+		    (if (gnus-nnselect-group-p gnus-newsgroup-name)
+			(with-current-buffer gnus-summary-buffer
+			  (let ((article (pop arts)))
+			    (cons (nnselect-article-group article)
+				  (nnselect-article-number article))))
+		      (nnvirtual-find-group-art
+		       (gnus-group-real-name gnus-newsgroup-name) (pop arts))))
 	  (let ((gnus-cache-removable-articles (list (cdr ga)))
 		(gnus-newsgroup-name (car ga)))
 	    (gnus-cache-possibly-remove-articles-1)))))
@@ -282,49 +294,47 @@ it's not cached."
 (defun gnus-cache-retrieve-headers (articles group &optional fetch-old)
   "Retrieve the headers for ARTICLES in GROUP."
   (let ((cached
-	 (setq gnus-newsgroup-cached (gnus-cache-articles-in-group group))))
+	 (setq gnus-newsgroup-cached (gnus-cache-articles-in-group group)))
+	(gnus-newsgroup-name group)
+	(gnus-fetch-old-headers fetch-old))
     (if (not cached)
 	;; No cached articles here, so we just retrieve them
 	;; the normal way.
 	(let ((gnus-use-cache nil))
-	  (gnus-retrieve-headers articles group fetch-old))
+	  (gnus-retrieve-headers articles group))
       (let ((uncached-articles (gnus-sorted-difference articles cached))
 	    (cache-file (gnus-cache-file-name group ".overview"))
-	    type
-	    (file-name-coding-system nnmail-pathname-coding-system))
+	    (file-name-coding-system nnmail-pathname-coding-system)
+	    headers)
 	;; We first retrieve all the headers that we don't have in
 	;; the cache.
 	(let ((gnus-use-cache nil))
 	  (when uncached-articles
-	    (setq type (and articles
-			    (gnus-retrieve-headers
-			     uncached-articles group fetch-old)))))
+	    (setq headers (and articles
+			       (gnus-fetch-headers uncached-articles)))))
 	(gnus-cache-save-buffers)
-	;; Then we insert the cached headers.
-	(save-excursion
-	  (cond
-	   ((not (file-exists-p cache-file))
-	    ;; There are no cached headers.
-	    type)
-	   ((null type)
-	    ;; There were no uncached headers (or retrieval was
-	    ;; unsuccessful), so we use the cached headers exclusively.
-	    (set-buffer nntp-server-buffer)
-	    (erase-buffer)
-	    (let ((coding-system-for-read
-		   gnus-cache-overview-coding-system))
-	      (insert-file-contents cache-file))
-	    'nov)
-	   ((eq type 'nov)
-	    ;; We have both cached and uncached NOV headers, so we
-	    ;; braid them.
-	    (gnus-cache-braid-nov group cached)
-	    type)
-	   (t
-	    ;; We braid HEADs.
-	    (gnus-cache-braid-heads group (gnus-sorted-intersection
-					   cached articles))
-	    type)))))))
+	;; Then we include the cached headers.
+	(when (file-exists-p cache-file)
+	  (setq headers
+		(delete-dups
+		 (sort
+		  (append headers
+			  (let ((coding-system-for-read
+				 gnus-cache-overview-coding-system))
+			    (with-current-buffer nntp-server-buffer
+			      (erase-buffer)
+			      (insert-file-contents cache-file)
+			      (gnus-get-newsgroup-headers-xover
+			       (gnus-sorted-difference
+				cached uncached-articles)
+			       nil (buffer-local-value
+				    'gnus-newsgroup-dependencies
+				    gnus-summary-buffer)
+			       group))))
+		  (lambda (l r)
+		    (< (mail-header-number l)
+		       (mail-header-number r)))))))
+	headers))))
 
 (defun gnus-cache-enter-article (&optional n)
   "Enter the next N articles into the cache.
@@ -467,8 +477,12 @@ Returns the list of articles removed."
 	(file-name-coding-system nnmail-pathname-coding-system))
     ;; If this is a virtual group, we find the real group.
     (when (gnus-virtual-group-p group)
-      (let ((result (nnvirtual-find-group-art
-		     (gnus-group-real-name group) article)))
+      (let ((result (if (gnus-nnselect-group-p group)
+			(with-current-buffer gnus-summary-buffer
+			  (cons (nnselect-article-group article)
+				(nnselect-article-number article)))
+		      (nnvirtual-find-group-art
+		       (gnus-group-real-name group) article))))
 	(setq group (car result)
 	      number (cdr result))))
     (setq file (gnus-cache-file-name group number))
@@ -501,7 +515,7 @@ Returns the list of articles removed."
     (when (file-exists-p dir)
       (setq articles
 	    (sort (mapcar (lambda (name) (string-to-number name))
-			  (directory-files dir nil "^[0-9]+$" t))
+			  (directory-files dir nil "\\`[0-9]+\\'" t))
 		  '<))
       ;; Update the cache active file, just to synch more.
       (if articles
@@ -512,70 +526,6 @@ Returns the list of articles removed."
 	  (remhash group gnus-cache-active-hashtb)
 	  (setq gnus-cache-active-altered t)))
       articles)))
-
-(defun gnus-cache-braid-nov (group cached &optional file)
-  (let ((cache-buf (gnus-get-buffer-create " *gnus-cache*"))
-	beg end)
-    (gnus-cache-save-buffers)
-    (with-current-buffer cache-buf
-      (erase-buffer)
-      (let ((coding-system-for-read gnus-cache-overview-coding-system)
-	    (file-name-coding-system nnmail-pathname-coding-system))
-	(insert-file-contents
-	 (or file (gnus-cache-file-name group ".overview"))))
-      (goto-char (point-min))
-      (insert "\n")
-      (goto-char (point-min)))
-    (set-buffer nntp-server-buffer)
-    (goto-char (point-min))
-    (while cached
-      (while (and (not (eobp))
-		  (< (read (current-buffer)) (car cached)))
-	(forward-line 1))
-      (beginning-of-line)
-      (set-buffer cache-buf)
-      (if (search-forward (concat "\n" (int-to-string (car cached)) "\t")
-			  nil t)
-	  (setq beg (point-at-bol)
-		end (progn (end-of-line) (point)))
-	(setq beg nil))
-      (set-buffer nntp-server-buffer)
-      (when beg
-	(insert-buffer-substring cache-buf beg end)
-	(insert "\n"))
-      (setq cached (cdr cached)))
-    (kill-buffer cache-buf)))
-
-(defun gnus-cache-braid-heads (group cached)
-  (let ((cache-buf (gnus-get-buffer-create " *gnus-cache*")))
-    (with-current-buffer cache-buf
-      (erase-buffer))
-    (set-buffer nntp-server-buffer)
-    (goto-char (point-min))
-    (dolist (entry cached)
-      (while (and (not (eobp))
-		  (looking-at "2.. +\\([0-9]+\\) ")
-		  (< (progn (goto-char (match-beginning 1))
-			    (read (current-buffer)))
-		     entry))
-	(search-forward "\n.\n" nil 'move))
-      (beginning-of-line)
-      (set-buffer cache-buf)
-      (erase-buffer)
-      (let ((coding-system-for-read gnus-cache-coding-system)
-	    (file-name-coding-system nnmail-pathname-coding-system))
-	(insert-file-contents (gnus-cache-file-name group entry)))
-      (goto-char (point-min))
-      (insert "220 ")
-      (princ (pop cached) (current-buffer))
-      (insert " Article retrieved.\n")
-      (search-forward "\n\n" nil 'move)
-      (delete-region (point) (point-max))
-      (forward-char -1)
-      (insert ".")
-      (set-buffer nntp-server-buffer)
-      (insert-buffer-substring cache-buf))
-    (kill-buffer cache-buf)))
 
 ;;;###autoload
 (defun gnus-jog-cache ()

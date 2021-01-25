@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990--1995, 1998--1999, 2001--2020 Free Software
+@c Copyright (C) 1990--1995, 1998--1999, 2001--2021 Free Software
 @c Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Command Loop
@@ -928,11 +928,17 @@ remapping), and @code{this-original-command} gives the command that
 was specified to run but remapped into another command.
 @end defvar
 
+@defvar current-minibuffer-command
+This has the same value as @code{this-command}, but is bound
+recursively when entering a minibuffer.  This variable can be used
+from minibuffer hooks and the like to determine what command opened
+the current minibuffer session.
+@end defvar
+
 @defun this-command-keys
 This function returns a string or vector containing the key sequence
-that invoked the present command, plus any previous commands that
-generated the prefix argument for this command.  Any events read by the
-command using @code{read-event} without a timeout get tacked on to the end.
+that invoked the present command.  Any events read by the command
+using @code{read-event} without a timeout get tacked on to the end.
 
 However, if the command has called @code{read-key-sequence}, it
 returns the last read key sequence.  @xref{Key Sequence Input}.  The
@@ -943,7 +949,7 @@ fit in a string.  @xref{Input Events}.
 @group
 (this-command-keys)
 ;; @r{Now use @kbd{C-u C-x C-e} to evaluate that.}
-     @result{} "^U^X^E"
+     @result{} "^X^E"
 @end group
 @end example
 @end defun
@@ -1346,10 +1352,11 @@ button.  @xref{Repeat Events}.
 
   To access the contents of a mouse position list in the
 @var{position} slot of a click event, you should typically use the
-functions documented in @ref{Accessing Mouse}.  The explicit format of
-the list depends on where the click occurred.  For clicks in the text
-area, mode line, header line, tab line, or in the fringe or marginal
-areas, the mouse position list has the form
+functions documented in @ref{Accessing Mouse}.
+
+The explicit format of the list depends on where the click occurred.
+For clicks in the text area, mode line, header line, tab line, or in
+the fringe or marginal areas, the mouse position list has the form
 
 @example
 (@var{window} @var{pos-or-area} (@var{x} . @var{y}) @var{timestamp}
@@ -1477,6 +1484,45 @@ the symbols @code{handle} (the scroll bar handle), @code{above-handle}
 handle), @code{up} (the up arrow at one end of the scroll bar), or
 @code{down} (the down arrow at one end of the scroll bar).
 @c The 'top', 'bottom', and 'end-scroll' codes don't seem to be used.
+@end table
+
+For clicks on the frame's internal border (@pxref{Frame Layout}),
+@var{position} has this form:
+
+@example
+ (@var{frame} @var{part} (@var{X} . @var{Y}) @var{timestamp})
+@end example
+
+@table @asis
+@item @var{frame}
+The frame whose internal border was clicked on.
+
+@item @var{part}
+The part of the internal border which was clicked on.  This can be one
+of the following:
+
+@table @code
+@item nil
+The frame does not have an internal border.  This usually happens on
+text-mode frames.  This can also happen on GUI frames with internal
+border if the frame doesn't have its @code{drag-internal-border}
+parameter (@pxref{Mouse Dragging Parameters}) set to a non-@code{nil}
+value.
+
+@item left-edge
+@itemx top-edge
+@itemx right-edge
+@itemx bottom-edge
+The click was on the corresponding border at an offset of at least one
+canonical character from the border's nearest corner.
+
+@item top-left-corner
+@itemx top-right-corner
+@itemx bottom-right-corner
+@itemx bottom-left-corner
+The click was on the corresponding corner of the internal border.
+@end table
+
 @end table
 
 
@@ -1844,6 +1890,13 @@ as @code{set-language-environment}), use the
 is, after a prefix key---then Emacs reorders the events so that this
 event comes either before or after the multi-event key sequence, not
 within it.
+
+  Some of these special events, such as @code{delete-frame}, invoke
+Emacs commands by default; others are not bound.  If you want to
+arrange for a special event to invoke a command, you can do that via
+@code{special-event-map}.  The command you bind to a function key in
+that map can then examine the full event which invoked it in
+@code{last-input-event}.  @xref{Special Events}.
 
 @node Event Examples
 @subsection Event Examples
@@ -2462,16 +2515,22 @@ button-down events entirely.  It also reshuffles focus events and
 miscellaneous window events so that they never appear in a key sequence
 with any other events.
 
-@cindex @code{tab-line} prefix key
-@cindex @code{header-line} prefix key
-@cindex @code{mode-line} prefix key
-@cindex @code{vertical-line} prefix key
-@cindex @code{horizontal-scroll-bar} prefix key
-@cindex @code{vertical-scroll-bar} prefix key
-@cindex @code{menu-bar} prefix key
-@cindex @code{tab-bar} prefix key
-@cindex mouse events, in special parts of frame
-When mouse events occur in special parts of a window, such as a mode
+@cindex @code{tab-line}, prefix key
+@cindex @code{header-line}, prefix key
+@cindex @code{mode-line}, prefix key
+@cindex @code{vertical-line}, prefix key
+@cindex @code{horizontal-scroll-bar}, prefix key
+@cindex @code{vertical-scroll-bar}, prefix key
+@cindex @code{menu-bar}, prefix key
+@cindex @code{tab-bar}, prefix key
+@cindex @code{left-margin}, prefix key
+@cindex @code{right-margin}, prefix key
+@cindex @code{left-fringe}, prefix key
+@cindex @code{right-fringe}, prefix key
+@cindex @code{right-divider}, prefix key
+@cindex @code{bottom-divider}, prefix key
+@cindex mouse events, in special parts of window or frame
+When mouse events occur in special parts of a window or frame, such as a mode
 line or a scroll bar, the event type shows nothing special---it is the
 same symbol that would normally represent that combination of mouse
 button and modifier keys.  The information about the window part is kept
@@ -2479,9 +2538,11 @@ elsewhere in the event---in the coordinates.  But
 @code{read-key-sequence} translates this information into imaginary
 prefix keys, all of which are symbols: @code{tab-line}, @code{header-line},
 @code{horizontal-scroll-bar}, @code{menu-bar}, @code{tab-bar}, @code{mode-line},
-@code{vertical-line}, and @code{vertical-scroll-bar}.  You can define
-meanings for mouse clicks in special window parts by defining key
-sequences using these imaginary prefix keys.
+@code{vertical-line}, @code{vertical-scroll-bar}, @code{left-margin},
+@code{right-margin}, @code{left-fringe}, @code{right-fringe},
+@code{right-divider}, and @code{bottom-divider}.  You can define meanings for
+mouse clicks in special window parts by defining key sequences using these
+imaginary prefix keys.
 
 For example, if you call @code{read-key-sequence} and then click the
 mouse on the window's mode line, you get two events, like this:
@@ -2635,9 +2696,11 @@ from the terminal---not counting those generated by keyboard macros.
 @code{read-event}, @code{read-char}, and @code{read-char-exclusive} do
 not perform the translations described in @ref{Translation Keymaps}.
 If you wish to read a single key taking these translations into
-account, use the function @code{read-key}:
+account (for example, to read @ref{Function Keys} in a terminal or
+@ref{Mouse Events} from @code{xterm-mouse-mode}), use the function
+@code{read-key}:
 
-@defun read-key &optional prompt
+@defun read-key &optional prompt disable-fallbacks
 This function reads a single key.  It is intermediate between
 @code{read-key-sequence} and @code{read-event}.  Unlike the former, it
 reads a single key, not a key sequence.  Unlike the latter, it does
@@ -2647,6 +2710,14 @@ and @code{key-translation-map} (@pxref{Translation Keymaps}).
 
 The argument @var{prompt} is either a string to be displayed in the
 echo area as a prompt, or @code{nil}, meaning not to display a prompt.
+
+If argument @var{disable-fallbacks} is non-@code{nil} then the usual
+fallback logic for unbound keys in @code{read-key-sequence} is not
+applied.  This means that mouse button-down and multi-click events
+will not be discarded and @code{local-function-key-map} and
+@code{key-translation-map} will not get applied.  If @code{nil} or
+unspecified, the only fallback disabled is downcasing of the last
+event.
 @end defun
 
 @defun read-char-choice prompt chars &optional inhibit-quit

@@ -1,6 +1,6 @@
 ;;; semantic/edit.el --- Edit Management for Semantic
 
-;; Copyright (C) 1999-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2021 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -120,9 +120,6 @@ incremental reparse.")
 (defvar semantic-edits-incremental-reparse-failed-hook nil
   "Hook run after the incremental parser fails.
 When this happens, the buffer is marked as needing a full reparse.")
-
-(semantic-varalias-obsolete 'semantic-edits-incremental-reparse-failed-hooks
-			    'semantic-edits-incremental-reparse-failed-hook "23.2")
 
 (defcustom semantic-edits-verbose-flag nil
   "Non-nil means the incremental parser is verbose.

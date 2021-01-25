@@ -1,6 +1,6 @@
 ;;; shadow.el --- locate Emacs Lisp file shadowings
 
-;; Copyright (C) 1995, 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1995, 2001-2021 Free Software Foundation, Inc.
 
 ;; Author: Terry Jones <terry@santafe.edu>
 ;; Keywords: lisp
@@ -55,9 +55,6 @@
   :prefix "load-path-shadows-"
   :group 'lisp)
 
-(define-obsolete-variable-alias 'shadows-compare-text-p
-  'load-path-shadows-compare-text "23.3")
-
 (defcustom load-path-shadows-compare-text nil
   "If non-nil, then shadowing files are reported only if their text differs.
 This is slower, but filters out some innocuous shadowing."
@@ -99,7 +96,8 @@ See the documentation for `list-load-path-shadows' for further information."
 	(setq true-names (append true-names (list dir)))
 	(setq dir (directory-file-name (or pp ".")))
 	(setq curr-files (if (file-accessible-directory-p dir)
-			     (directory-files dir nil ".\\.elc?\\(\\.gz\\)?$" t)))
+			     (directory-files dir nil
+                                              "\\.elc?\\(?:\\.gz\\)?\\'" t)))
 	(and curr-files
 	     (not noninteractive)
 	     (message "Checking %d files in %s..." (length curr-files) dir))
@@ -179,13 +177,12 @@ See the documentation for `list-load-path-shadows' for further information."
 
 (define-derived-mode load-path-shadows-mode fundamental-mode "LP-Shadows"
   "Major mode for load-path shadows buffer."
-  (set (make-local-variable 'font-lock-defaults)
-       '((load-path-shadows-font-lock-keywords)))
+  (setq-local font-lock-defaults
+              '((load-path-shadows-font-lock-keywords)))
   (setq buffer-undo-list t
 	buffer-read-only t))
 
 ;; TODO use text-properties instead, a la dired.
-(require 'button)
 (define-button-type 'load-path-shadows-find-file
   'follow-link t
 ;;  'face 'default

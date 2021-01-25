@@ -1,6 +1,6 @@
 ;;; eudcb-ldap.el --- Emacs Unified Directory Client - LDAP Backend
 
-;; Copyright (C) 1998-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2021 Free Software Foundation, Inc.
 
 ;; Author: Oscar Figueiredo <oscar@cpe.fr>
 ;;         Pavel Janík <Pavel@Janik.cz>
@@ -76,12 +76,11 @@
   "Do some cleanup in a RECORD to make it suitable for EUDC."
   (declare (obsolete eudc-ldap-cleanup-record-filtering-addresses "25.1"))
   (mapcar
-   (function
-    (lambda (field)
-      (cons (intern (downcase (car field)))
-	    (if (cdr (cdr field))
-		(cdr field)
-	      (car (cdr field))))))
+   (lambda (field)
+     (cons (intern (downcase (car field)))
+           (if (cdr (cdr field))
+               (cdr field)
+             (car (cdr field)))))
    record))
 
 (defun eudc-filter-$ (string)
@@ -138,10 +137,10 @@ RETURN-ATTRS is a list of attributes to return, defaulting to
     ;; Apply eudc-duplicate-attribute-handling-method
     (if (not (eq 'list eudc-duplicate-attribute-handling-method))
 	(mapc
-	 (function (lambda (record)
-		     (setq final-result
-			   (append (eudc-filter-duplicate-attributes record)
-				   final-result))))
+         (lambda (record)
+           (setq final-result
+                 (append (eudc-filter-duplicate-attributes record)
+                         final-result)))
 	 result))
     final-result))
 

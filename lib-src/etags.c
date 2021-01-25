@@ -28,7 +28,7 @@ OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-Copyright (C) 1984, 1987-1989, 1993-1995, 1998-2020 Free Software
+Copyright (C) 1984, 1987-1989, 1993-1995, 1998-2021 Free Software
 Foundation, Inc.
 
 This file is not considered part of GNU Emacs.
@@ -1643,19 +1643,10 @@ process_file_name (char *file, language *lang)
 	  char *cmd = concat (cmd1, "' > ", tmp_name);
 #endif
 	  free (cmd1);
-	  int tmp_errno;
-	  if (system (cmd) == -1)
-	    {
-	      inf = NULL;
-	      tmp_errno = EINVAL;
-	    }
-	  else
-	    {
-	      inf = fopen (tmp_name, "r" FOPEN_BINARY);
-	      tmp_errno = errno;
-	    }
+	  inf = (system (cmd) == -1
+		 ? NULL
+		 : fopen (tmp_name, "r" FOPEN_BINARY));
 	  free (cmd);
-	  errno = tmp_errno;
 	}
 
       if (!inf)
@@ -1974,19 +1965,21 @@ make_tag (const char *name, 	/* tag name, or NULL if unnamed */
 
 /* Record a tag. */
 static void
-pfnote (char *name, bool is_func, char *linestart, ptrdiff_t linelen,
-	intmax_t lno, intmax_t cno)
-                		/* tag name, or NULL if unnamed */
-                  		/* tag is a function */
-                     		/* start of the line where tag is */
-                 		/* length of the line where tag is */
-             			/* line number */
-              			/* character number */
+pfnote (char *name,		/* tag name, or NULL if unnamed */
+	bool is_func,		/* tag is a function */
+	char *linestart,	/* start of the line where tag is */
+	ptrdiff_t linelen,	/* length of the line where tag is */
+	intmax_t lno,		/* line number */
+	intmax_t cno)		/* character number */
+
 {
   register node *np;
 
-  assert (name == NULL || name[0] != '\0');
-  if (CTAGS && name == NULL)
+  if ((CTAGS && name == NULL)
+      /* We used to have an assertion here for the case below, but if we hit
+	 that case, it just means our parser got confused, and there's nothing
+	 to do about such empty "tags".  */
+      || (!CTAGS && name && name[0] == '\0'))
     return;
 
   np = xnew (1, node);
@@ -2902,15 +2895,13 @@ static void make_C_tag (bool);
  */
 
 static bool
-consider_token (char *str, ptrdiff_t len, int c, int *c_extp,
-		ptrdiff_t bracelev, ptrdiff_t parlev, bool *is_func_or_var)
-                        	/* IN: token pointer */
-                      		/* IN: token length */
-                    		/* IN: first char after the token */
-                 		/* IN, OUT: C extensions mask */
-                  		/* IN: brace level */
-                		/* IN: parenthesis level */
-                          	/* OUT: function or variable found */
+consider_token (char *str,	      /* IN: token pointer */
+		ptrdiff_t len,	      /* IN: token length */
+		int c,		      /* IN: first char after the token */
+		int *c_extp,	      /* IN, OUT: C extensions mask */
+		ptrdiff_t bracelev,   /* IN: brace level */
+		ptrdiff_t parlev,     /* IN: parenthesis level */
+		bool *is_func_or_var) /* OUT: function or variable found */
 {
   /* When structdef is stagseen, scolonseen, or snone with bracelev > 0,
      structtype is the type of the preceding struct-like keyword, and
@@ -3309,9 +3300,8 @@ perhaps_more_input (FILE *inf)
  * 	C syntax and adds them to the list.
  */
 static void
-C_entries (int c_ext, FILE *inf)
-               			/* extension of C */
-               			/* input file */
+C_entries (int c_ext,		/* extension of C */
+	   FILE *inf)		/* input file */
 {
   char c;			/* latest char read; '\0' for end of line */
   char *lp;			/* pointer one beyond the character `c' */
@@ -4197,9 +4187,9 @@ C_entries (int c_ext, FILE *inf)
 	      break;
 	    }
 	  FALLTHROUGH;
-	resetfvdef:
 	case '#': case '~': case '&': case '%': case '/':
 	case '|': case '^': case '!': case '.': case '?':
+	resetfvdef:
 	  if (definedef != dnone)
 	    break;
 	  /* These surely cannot follow a function tag in C. */
@@ -6064,6 +6054,7 @@ Erlang_functions (FILE *inf)
 	    {
 	      free (last);
 	      last = NULL;
+	      allocated = lastlen = 0;
 	    }
 	}
       else
@@ -7068,9 +7059,7 @@ etags_mktmp (void)
   int fd = mkostemp (templt, O_CLOEXEC);
   if (fd < 0 || close (fd) != 0)
     {
-      int temp_errno = errno;
       free (templt);
-      errno = temp_errno;
       templt = NULL;
     }
 #if defined (DOS_NT)

@@ -1,6 +1,6 @@
 ;;; hideshow.el --- minor mode cmds to selectively display code/comment blocks  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1994-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1994-2021 Free Software Foundation, Inc.
 
 ;; Author: Thien-Thi Nguyen <ttn@gnu.org>
 ;;      Dan Nicolaescu <dann@ics.uci.edu>
@@ -264,7 +264,10 @@ This has effect only if `search-invisible' is set to `open'."
     (c++-mode "{" "}" "/[*/]" nil nil)
     (bibtex-mode ("@\\S(*\\(\\s(\\)" 1))
     (java-mode "{" "}" "/[*/]" nil nil)
-    (js-mode "{" "}" "/[*/]" nil)))
+    (js-mode "{" "}" "/[*/]" nil)
+    (mhtml-mode "{\\|<[^/>]*?" "}\\|</[^/>]*[^/]>" "<!--" mhtml-forward nil)
+    ;; Add more support here.
+    ))
   "Alist for initializing the hideshow variables for different modes.
 Each element has the form
   (MODE START END COMMENT-START FORWARD-SEXP-FUNC ADJUST-BEG-FUNC).
@@ -945,8 +948,7 @@ Key bindings:
         (add-hook 'change-major-mode-hook
                   #'turn-off-hideshow
                   nil t)
-        (easy-menu-add hs-minor-mode-menu)
-        (set (make-local-variable 'line-move-ignore-invisible) t)
+        (setq-local line-move-ignore-invisible t)
         (add-to-invisibility-spec '(hs . t)))
     (remove-from-invisibility-spec '(hs . t))
     ;; hs-show-all does nothing unless h-m-m is non-nil.

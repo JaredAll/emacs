@@ -1,6 +1,6 @@
 ;;; cl.el --- Compatibility aliases for the old CL library.  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2012-2021 Free Software Foundation, Inc.
 
 ;; Author: Stefan Monnier <monnier@iro.umontreal.ca>
 ;; Deprecated-since: 27.1
@@ -113,7 +113,7 @@
                most-positive-float
                ;; custom-print-functions
                ))
-  (defvaralias var (intern (format "cl-%s" var))))
+  (define-obsolete-variable-alias var (intern (format "cl-%s" var)) "27.1"))
 
 (dolist (fun '(
                (get* . cl-get)
@@ -291,7 +291,7 @@
                ))
   (let ((new (if (consp fun) (prog1 (cdr fun) (setq fun (car fun)))
                (intern (format "cl-%s" fun)))))
-    (defalias fun new)))
+    (define-obsolete-function-alias fun new "27.1")))
 
 (defun cl--wrap-in-nil-block (fun &rest args)
   `(cl-block nil ,(apply fun args)))
@@ -509,7 +509,7 @@ This method shows how to handle `setf's to places of the form
 ARGLIST, as if NAME were going to be expanded as a macro, then
 the BODY forms are executed and must return a list of five elements:
 a temporary-variables list, a value-forms list, a store-variables list
-\(of length one), a store-form, and an access- form.
+\(of length one), a store-form, and an access-form.
 
 See `gv-define-expander', and `gv-define-setter' for better and
 simpler ways to define setf-methods."

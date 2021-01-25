@@ -1,6 +1,6 @@
 ;;; double.el --- support for keyboard remapping with double clicking
 
-;; Copyright (C) 1994, 1997-1998, 2001-2020 Free Software Foundation,
+;; Copyright (C) 1994, 1997-1998, 2001-2021 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Per Abrahamsen <abraham@dina.kvl.dk>
@@ -99,7 +99,7 @@ but not `C-u X' or `ESC X' since the X is not the prefix key."
     (load-library "isearch"))
 
 (define-key isearch-mode-map [ignore]
-  (function (lambda () (interactive) (isearch-update))))
+  (lambda () (interactive) (isearch-update)))
 
 (defun double-translate-key (prompt)
   ;; Translate input events using double map.

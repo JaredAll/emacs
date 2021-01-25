@@ -1,6 +1,6 @@
 ;;; tibet-util.el --- utilities for Tibetan   -*- coding: utf-8-emacs; -*-
 
-;; Copyright (C) 1997, 2001-2020 Free Software Foundation, Inc.
+;; Copyright (C) 1997, 2001-2021 Free Software Foundation, Inc.
 ;; Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
 ;;   2005, 2006, 2007, 2008, 2009, 2010, 2011
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -43,13 +43,17 @@
     ("་" . "་")
     ("༔" . "༔")
     ;; Yes these are dirty. But ...
-    ("༎ ༎" . ,(compose-string "༎ ༎" 0 3 [?༎ (Br . Bl) ?  (Br . Bl) ?༎]))
+    ("༎ ༎" . ,(compose-string (copy-sequence "༎ ༎")
+			      0 3 [?༎ (Br . Bl) ?  (Br . Bl) ?༎]))
     ("༄༅༅" . ,(compose-string
-		  "࿁࿂࿂࿂" 0 4
+		  (copy-sequence "࿁࿂࿂࿂") 0 4
 		  [?࿁ (Br . Bl) ?࿂ (Br . Bl) ?࿂ (Br . Bl) ?࿂]))
-    ("༄༅" . ,(compose-string "࿁࿂࿂" 0 3 [?࿁ (Br . Bl) ?࿂ (Br . Bl) ?࿂]))
-    ("༆" . ,(compose-string "࿁࿂༙" 0 3 [?࿁ (Br . Bl) ?࿂ (br . tr) ?༙]))
-    ("༄"   . ,(compose-string "࿁࿂" 0 2 [?࿁ (Br . Bl) ?࿂]))))
+    ("༄༅" . ,(compose-string (copy-sequence "࿁࿂࿂")
+			     0 3 [?࿁ (Br . Bl) ?࿂ (Br . Bl) ?࿂]))
+    ("༆" . ,(compose-string (copy-sequence "࿁࿂༙")
+			    0 3 [?࿁ (Br . Bl) ?࿂ (br . tr) ?༙]))
+    ("༄"   . ,(compose-string (copy-sequence "࿁࿂")
+			      0 2 [?࿁ (Br . Bl) ?࿂]))))
 
 ;;;###autoload
 (defun tibetan-char-p (ch)
@@ -271,7 +275,7 @@ The returned string has no composition information."
 	    (compose-region from to components)))))))
 
 (defvar tibetan-decompose-precomposition-alist
-  (mapcar (function (lambda (x) (cons (string-to-char (cdr x)) (car x))))
+  (mapcar (lambda (x) (cons (string-to-char (cdr x)) (car x)))
 	  tibetan-precomposition-rule-alist))
 
 ;;;###autoload

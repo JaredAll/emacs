@@ -1,6 +1,6 @@
 /* MS-DOS specific C utilities.          -*- coding: cp850 -*-
 
-Copyright (C) 1993-1997, 1999-2020 Free Software Foundation, Inc.
+Copyright (C) 1993-1997, 1999-2021 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -2905,7 +2905,7 @@ IT_menu_display (XMenu *menu, int y, int x, int pn, int *faces, int disp_help)
       p++;
       for (j = 0, q = menu->text[i]; *q; j++)
 	{
-	  unsigned c = STRING_CHAR_ADVANCE (q);
+	  unsigned c = string_char_advance (&q);
 
 	  if (c > 26)
 	    {

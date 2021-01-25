@@ -1,10 +1,10 @@
 ;;; wdired.el --- Rename files editing their names in dired buffers -*- coding: utf-8; -*-
 
-;; Copyright (C) 2004-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2021 Free Software Foundation, Inc.
 
 ;; Filename: wdired.el
 ;; Author: Juan León Lahoz García <juanleon1@gmail.com>
-;; Version: 2.0
+;; Old-Version: 2.0
 ;; Keywords: dired, environment, files, renaming
 
 ;; This file is part of GNU Emacs.
@@ -242,12 +242,12 @@ See `wdired-mode'."
   (interactive)
   (unless (derived-mode-p 'dired-mode)
     (error "Not a Dired buffer"))
-  (set (make-local-variable 'wdired-old-content)
-       (buffer-substring (point-min) (point-max)))
-  (set (make-local-variable 'wdired-old-marks)
-       (dired-remember-marks (point-min) (point-max)))
-  (set (make-local-variable 'wdired-old-point) (point))
-  (set (make-local-variable 'query-replace-skip-read-only) t)
+  (setq-local wdired-old-content
+              (buffer-substring (point-min) (point-max)))
+  (setq-local wdired-old-marks
+              (dired-remember-marks (point-min) (point-max)))
+  (setq-local wdired-old-point (point))
+  (setq-local query-replace-skip-read-only t)
   (add-function :after-while (local 'isearch-filter-predicate)
                 #'wdired-isearch-filter-read-only)
   (use-local-map wdired-mode-map)
@@ -255,7 +255,7 @@ See `wdired-mode'."
   (setq buffer-read-only nil)
   (dired-unadvertise default-directory)
   (add-hook 'kill-buffer-hook 'wdired-check-kill-buffer nil t)
-  (add-hook 'after-change-functions 'wdired--restore-dired-filename-prop nil t)
+  (add-hook 'after-change-functions 'wdired--restore-properties nil t)
   (setq major-mode 'wdired-mode)
   (setq mode-name "Editable Dired")
   (setq revert-buffer-function 'wdired-revert)
@@ -266,7 +266,7 @@ See `wdired-mode'."
   (wdired-preprocess-files)
   (if wdired-allow-to-change-permissions
       (wdired-preprocess-perms))
-  (if (and wdired-allow-to-redirect-links (fboundp 'make-symbolic-link))
+  (if (fboundp 'make-symbolic-link)
       (wdired-preprocess-symlinks))
   (buffer-enable-undo) ; Performance hack. See above.
   (set-buffer-modified-p nil)
@@ -288,6 +288,7 @@ or \\[wdired-abort-changes] to abort changes")))
   (save-excursion
     (goto-char (point-min))
     (let ((b-protection (point))
+          (used-F (dired-check-switches dired-actual-switches "F" "classify"))
 	  filename)
       (while (not (eobp))
 	(setq filename (dired-get-filename nil t))
@@ -299,8 +300,16 @@ or \\[wdired-abort-changes] to abort changes")))
 	  (add-text-properties
 	   (1- (point)) (point) `(old-name ,filename rear-nonsticky (read-only)))
 	  (put-text-property b-protection (point) 'read-only t)
-	  (setq b-protection (dired-move-to-end-of-filename t))
+          (dired-move-to-end-of-filename t)
 	  (put-text-property (point) (1+ (point)) 'end-name t))
+          (when (and used-F (looking-at "[*/@|=>]$")) (forward-char))
+          (when (save-excursion
+                  (and (re-search-backward
+                        dired-permission-flags-regexp nil t)
+                       (looking-at "l")
+                       (search-forward " -> " (line-end-position) t)))
+            (goto-char (line-end-position)))
+	  (setq b-protection (point))
         (forward-line))
       (put-text-property b-protection (point-max) 'read-only t))))
 
@@ -327,7 +336,8 @@ relies on WDired buffer's properties.  Optional arg NO-DIR with value
 non-nil means don't include directory.  Optional arg OLD with value
 non-nil means return old filename."
   ;; FIXME: Use dired-get-filename's new properties.
-  (let (beg end file)
+  (let ((used-F (dired-check-switches dired-actual-switches "F" "classify"))
+        beg end file)
     (save-excursion
       (setq end (line-end-position))
       (beginning-of-line)
@@ -339,12 +349,28 @@ non-nil means return old filename."
 	  ;; the filename end is found even when the filename is empty.
 	  ;; Fixes error and spurious newlines when marking files for
 	  ;; deletion.
-	  (setq end (next-single-property-change beg 'end-name))
+	  (setq end (next-single-property-change beg 'end-name nil end))
+          (when (save-excursion
+                  (and (re-search-forward
+                        dired-permission-flags-regexp nil t)
+                       (goto-char (match-beginning 0))
+                       (looking-at "l")
+                       (if (and used-F
+                                dired-ls-F-marks-symlinks)
+                           (re-search-forward "@? -> " (line-end-position) t)
+                         (search-forward " -> " (line-end-position) t))))
+            (goto-char (match-beginning 0))
+            (setq end (point)))
+          (when (and used-F
+                     (save-excursion
+                       (goto-char end)
+                       (looking-back "[*/@|=>]$" (1- (point)))))
+              (setq end (1- end)))
 	  (setq file (buffer-substring-no-properties (1+ beg) end)))
 	;; Don't unquote the old name, it wasn't quoted in the first place
         (and file (setq file (wdired-normalize-filename file (not old)))))
       (if (or no-dir old)
-	  file
+	  (if no-dir (file-relative-name file) file)
 	(and file (> (length file) 0)
              (concat (dired-current-directory) file))))))
 
@@ -366,8 +392,8 @@ non-nil means return old filename."
   (setq mode-name "Dired")
   (dired-advertise)
   (remove-hook 'kill-buffer-hook 'wdired-check-kill-buffer t)
-  (remove-hook 'after-change-functions 'wdired--restore-dired-filename-prop t)
-  (set (make-local-variable 'revert-buffer-function) 'dired-revert))
+  (remove-hook 'after-change-functions 'wdired--restore-properties t)
+  (setq-local revert-buffer-function 'dired-revert))
 
 
 (defun wdired-abort-changes ()
@@ -427,9 +453,9 @@ non-nil means return old filename."
     (when files-renamed
       (setq errors (+ errors (wdired-do-renames files-renamed))))
     ;; We have to be in wdired-mode when wdired-do-renames is executed
-    ;; so that wdired--restore-dired-filename-prop runs, but we have
-    ;; to change back to dired-mode before reverting the buffer to
-    ;; avoid using wdired-revert, which changes back to wdired-mode.
+    ;; so that wdired--restore-properties runs, but we have to change
+    ;; back to dired-mode before reverting the buffer to avoid using
+    ;; wdired-revert, which changes back to wdired-mode.
     (wdired-change-to-dired-mode)
     (if changes
 	(progn
@@ -451,20 +477,26 @@ non-nil means return old filename."
 				'(old-name nil end-name nil old-link nil
 					   end-link nil end-perm nil
 					   old-perm nil perm-changed nil))
-	(message "(No changes to be performed)")))
+	(message "(No changes to be performed)")
+        ;; Deleting file indicator characters or editing the symlink
+        ;; arrow in WDired are noops, so redisplay them immediately on
+        ;; returning to Dired.
+        (revert-buffer)))
     (when files-deleted
       (wdired-flag-for-deletion files-deleted))
     (when (> errors 0)
-      (dired-log-summary (format "%d rename actions failed" errors) nil)))
+      (dired-log-summary (format "%d actions failed" errors) nil)))
   (set-buffer-modified-p nil)
   (setq buffer-undo-list nil))
 
 (defun wdired-do-renames (renames)
   "Perform RENAMES in parallel."
-  (let ((residue ())
-        (progress nil)
-        (errors 0)
-        (overwrite (or (not wdired-confirm-overwrite) 1)))
+  (let* ((residue ())
+         (progress nil)
+         (errors 0)
+         (total (1- (length renames)))
+         (prep (make-progress-reporter "Renaming" 0 total))
+         (overwrite (or (not wdired-confirm-overwrite) 1)))
     (while (or renames
                ;; We've done one round through the renames, we have found
                ;; some residue, but we also made some progress, so maybe
@@ -472,6 +504,7 @@ non-nil means return old filename."
                (prog1 (setq renames residue)
                  (setq progress nil)
                  (setq residue nil)))
+      (progress-reporter-update prep (- total (length renames)))
       (let* ((rename (pop renames))
              (file-new (cdr rename)))
         (cond
@@ -519,6 +552,7 @@ non-nil means return old filename."
                  (dired-log "Rename `%s' to `%s' failed:\n%s\n"
                             file-ori file-new
                             err)))))))))
+    (progress-reporter-done prep)
     errors))
 
 (defun wdired-create-parentdirs (file-new)
@@ -605,11 +639,24 @@ Optional arguments are ignored."
 ;; dired-filename text property, which allows functions that look for
 ;; this property (e.g. dired-isearch-filenames) to work in wdired-mode
 ;; and also avoids an error with non-nil wdired-use-interactive-rename
-;; (bug#32173).
-(defun wdired--restore-dired-filename-prop (beg end _len)
+;; (bug#32173).  Also prevents editing the symlink arrow (which is a
+;; noop) from corrupting the link name (see bug#18475 for elaboration).
+(defun wdired--restore-properties (beg end _len)
   (save-match-data
     (save-excursion
-      (let ((lep (line-end-position)))
+      (let ((lep (line-end-position))
+            (used-F (dired-check-switches
+                     dired-actual-switches
+                     "F" "classify")))
+        ;; Deleting the space between the link name and the arrow (a
+        ;; noop) also deletes the end-name property, so restore it.
+        (when (and (save-excursion
+                     (re-search-backward dired-permission-flags-regexp nil t)
+                     (looking-at "l"))
+                   (get-text-property (1- (point)) 'dired-filename)
+                   (not (get-text-property (point) 'dired-filename))
+                   (not (get-text-property (point) 'end-name)))
+            (put-text-property (point) (1+ (point)) 'end-name t))
         (beginning-of-line)
         (when (re-search-forward
                directory-listing-before-filename-regexp lep t)
@@ -623,13 +670,17 @@ Optional arguments are ignored."
                          (and (re-search-backward
                                dired-permission-flags-regexp nil t)
                               (looking-at "l")
-                              (search-forward " -> " lep t))
+                              ;; macOS and Ultrix adds "@" to the end
+                              ;; of symlinks when using -F.
+                              (if (and used-F
+                                       dired-ls-F-marks-symlinks)
+                                  (re-search-forward "@? -> " lep t)
+                                (search-forward " -> " lep t)))
                          ;; When dired-listing-switches includes "F"
                          ;; or "classify", don't treat appended
                          ;; indicator characters as part of the file
                          ;; name (bug#34915).
-                         (and (dired-check-switches dired-actual-switches
-                                                    "F" "classify")
+                         (and used-F
                               (re-search-forward "[*/@|=>]$" lep t)))
                         (goto-char (match-beginning 0))
                       lep))
@@ -669,33 +720,36 @@ says how many lines to move; default is one line."
     (save-excursion
       (goto-char (point-min))
       (while (not (eobp))
-        (if (looking-at dired-re-sym)
-            (progn
-              (re-search-forward " -> \\(.*\\)$")
-	      (put-text-property (- (match-beginning 1) 2)
-				 (1- (match-beginning 1)) 'old-link
-				 (match-string-no-properties 1))
-              (put-text-property (match-end 1) (1+ (match-end 1)) 'end-link t)
-              (put-text-property (1- (match-beginning 1))
-				 (match-beginning 1)
-				 'rear-nonsticky '(read-only))
-	      (put-text-property (match-beginning 1)
-				 (match-end 1) 'read-only nil)))
+        (when (looking-at dired-re-sym)
+          (re-search-forward " -> \\(.*\\)$")
+	  (put-text-property (1- (match-beginning 1))
+			     (match-beginning 1) 'old-link
+			     (match-string-no-properties 1))
+          (put-text-property (match-end 1) (1+ (match-end 1)) 'end-link t)
+          (unless wdired-allow-to-redirect-links
+            (put-text-property (match-beginning 0)
+			       (match-end 1) 'read-only t)))
         (forward-line)))))
-
 
 (defun wdired-get-previous-link (&optional old move)
   "Return the next symlink target.
 If OLD, return the old target.  If MOVE, move point before it."
   (let (beg end target)
     (setq beg (previous-single-property-change (point) 'old-link nil))
-    (if beg
-	(progn
-	  (if old
-	      (setq target (get-text-property (1- beg) 'old-link))
-	    (setq end (next-single-property-change beg 'end-link))
-	    (setq target (buffer-substring-no-properties (1+ beg) end)))
-	  (if move (goto-char (1- beg)))))
+    (when beg
+      (when (save-excursion
+              (goto-char beg)
+              (and (looking-at " ")
+                   (looking-back " ->" (line-beginning-position))))
+        (setq beg (1+ beg)))
+      (if old
+          (setq target (get-text-property (1- beg) 'old-link))
+        (setq end (save-excursion
+                    (goto-char beg)
+                    (next-single-property-change beg 'end-link nil
+                                                 (line-end-position))))
+        (setq target (buffer-substring-no-properties beg end)))
+      (if move (goto-char (1- beg))))
     (and target (wdired-normalize-filename target t))))
 
 (declare-function make-symbolic-link "fileio.c")
@@ -712,7 +766,7 @@ If OLD, return the old target.  If MOVE, move point before it."
       (unless (equal link-to-new link-to-ori)
         (setq changes t)
         (if (equal link-to-new "") ;empty filename!
-            (setq link-to-new "/dev/null"))
+            (setq link-to-new (null-device)))
         (condition-case err
             (progn
               (delete-file link-from)
@@ -783,7 +837,7 @@ Like original function but it skips read-only words."
 ;; original name and permissions as a property
 (defun wdired-preprocess-perms ()
   (let ((inhibit-read-only t))
-    (set (make-local-variable 'wdired-col-perm) nil)
+    (setq-local wdired-col-perm nil)
     (save-excursion
       (goto-char (point-min))
       (while (not (eobp))
@@ -860,26 +914,26 @@ Like original function but it skips read-only words."
   (mouse-set-point event)
   (wdired-toggle-bit))
 
-;; Allowed chars for 4000 bit are Ss  in position 3
-;; Allowed chars for 2000 bit are Ssl in position 6
-;; Allowed chars for 1000 bit are Tt  in position 9
+;; Allowed chars for #o4000 bit are Ss  in position 3
+;; Allowed chars for #o2000 bit are Ssl in position 6
+;; Allowed chars for #o1000 bit are Tt  in position 9
 (defun wdired-perms-to-number (perms)
-  (let ((nperm 0777))
-    (if (= (elt perms 1) ?-) (setq nperm (- nperm 400)))
-    (if (= (elt perms 2) ?-) (setq nperm (- nperm 200)))
+  (let ((nperm #o0777))
+    (if (= (elt perms 1) ?-) (setq nperm (- nperm #o400)))
+    (if (= (elt perms 2) ?-) (setq nperm (- nperm #o200)))
     (let ((p-bit (elt perms 3)))
-      (if (memq p-bit '(?- ?S)) (setq nperm (- nperm 100)))
-      (if (memq p-bit '(?s ?S)) (setq nperm (+ nperm 4000))))
-    (if (= (elt perms 4) ?-) (setq nperm (- nperm 40)))
-    (if (= (elt perms 5) ?-) (setq nperm (- nperm 20)))
+      (if (memq p-bit '(?- ?S)) (setq nperm (- nperm #o100)))
+      (if (memq p-bit '(?s ?S)) (setq nperm (+ nperm #o4000))))
+    (if (= (elt perms 4) ?-) (setq nperm (- nperm #o40)))
+    (if (= (elt perms 5) ?-) (setq nperm (- nperm #o20)))
     (let ((p-bit (elt perms 6)))
-      (if (memq p-bit '(?- ?S ?l)) (setq nperm (- nperm 10)))
-      (if (memq p-bit '(?s ?S ?l)) (setq nperm (+ nperm 2000))))
+      (if (memq p-bit '(?- ?S ?l)) (setq nperm (- nperm #o10)))
+      (if (memq p-bit '(?s ?S ?l)) (setq nperm (+ nperm #o2000))))
     (if (= (elt perms 7) ?-) (setq nperm (- nperm 4)))
     (if (= (elt perms 8) ?-) (setq nperm (- nperm 2)))
     (let ((p-bit (elt perms 9)))
       (if (memq p-bit '(?- ?T)) (setq nperm (- nperm 1)))
-      (if (memq p-bit '(?t ?T)) (setq nperm (+ nperm 1000))))
+      (if (memq p-bit '(?t ?T)) (setq nperm (+ nperm #o1000))))
     nperm))
 
 ;; Perform the changes in the permissions of the files that have
@@ -889,7 +943,7 @@ Like original function but it skips read-only words."
 	(errors 0)
 	(prop-wanted (if (eq wdired-allow-to-change-permissions 'advanced)
 			 'old-perm 'perm-changed))
-	filename perms-ori perms-new perm-tmp)
+	filename perms-ori perms-new)
     (goto-char (next-single-property-change (point-min) prop-wanted
 					    nil (point-max)))
     (while (not (eobp))
@@ -900,14 +954,12 @@ Like original function but it skips read-only words."
         (setq changes t)
         (setq filename (wdired-get-filename nil t))
         (if (= (length perms-new) 10)
-            (progn
-              (setq perm-tmp
-                    (int-to-string (wdired-perms-to-number perms-new)))
-              (unless (equal 0 (process-file dired-chmod-program
-					     nil nil nil perm-tmp filename))
-                (setq errors (1+ errors))
-                (dired-log "%s %s `%s' failed\n\n"
-                           dired-chmod-program perm-tmp filename)))
+            (condition-case nil
+                (set-file-modes filename (wdired-perms-to-number perms-new))
+              (error
+               (setq errors (1+ errors))
+               (dired-log "Setting mode of `%s' to `%s' failed\n\n"
+                          filename perms-new)))
           (setq errors (1+ errors))
           (dired-log "Cannot parse permission `%s' for file `%s'\n\n"
                      perms-new filename)))

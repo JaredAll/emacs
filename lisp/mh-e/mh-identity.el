@@ -1,6 +1,6 @@
 ;;; mh-identity.el --- multiple identify support for MH-E
 
-;; Copyright (C) 2002-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2021 Free Software Foundation, Inc.
 
 ;; Author: Peter S. Galbraith <psg@debian.org>
 ;; Maintainer: Bill Wohler <wohler@newt.com>
@@ -71,10 +71,9 @@ See `mh-identity-add-menu'."
         (mh-insert-auto-fields) mh-auto-fields-list]
        "--")
 
-     (mapcar (function
-              (lambda (arg)
-                `[,arg  (mh-insert-identity ,arg) :style radio
-                        :selected (equal mh-identity-local ,arg)]))
+     (mapcar (lambda (arg)
+               `[,arg  (mh-insert-identity ,arg) :style radio
+                       :selected (equal mh-identity-local ,arg)])
              (mapcar 'car mh-identity-list))
      '(["None"
         (mh-insert-identity "None") :style radio
@@ -92,7 +91,7 @@ See `mh-identity-add-menu'."
   "Add the current Identity menu.
 See `mh-identity-make-menu'."
   (if mh-identity-menu
-      (easy-menu-add mh-identity-menu)))
+      (mh-do-in-xemacs (easy-menu-add mh-identity-menu))))
 
 (defvar mh-identity-local nil
   "Buffer-local variable that holds the identity currently in use.")

@@ -1,6 +1,6 @@
 ;;; tramp-sudoedit.el --- Functions for accessing under root permissions  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2018-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2018-2021 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
@@ -132,6 +132,8 @@ See `tramp-actions-before-shell' for more info.")
     (start-file-process . ignore)
     (substitute-in-file-name . tramp-handle-substitute-in-file-name)
     (temporary-file-directory . tramp-handle-temporary-file-directory)
+    (tramp-get-remote-gid . tramp-sudoedit-handle-get-remote-gid)
+    (tramp-get-remote-uid . tramp-sudoedit-handle-get-remote-uid)
     (tramp-set-file-uid-gid . tramp-sudoedit-handle-set-file-uid-gid)
     (unhandled-file-name-directory . ignore)
     (vc-registered . ignore)
@@ -319,29 +321,25 @@ absolute file names."
 (defun tramp-sudoedit-handle-delete-directory
     (directory &optional recursive trash)
   "Like `delete-directory' for Tramp files."
-  (setq directory (expand-file-name directory))
-  (with-parsed-tramp-file-name directory nil
-    (tramp-flush-directory-properties v localname)
-    (unless
-	(tramp-sudoedit-send-command
-	 v (or (and trash "trash")
-	       (if recursive '("rm" "-rf") "rmdir"))
-	 (tramp-compat-file-name-unquote localname))
+  (tramp-skeleton-delete-directory directory recursive trash
+    (unless (tramp-sudoedit-send-command
+	     v (if recursive '("rm" "-rf") "rmdir")
+	     (tramp-compat-file-name-unquote localname))
       (tramp-error v 'file-error "Couldn't delete %s" directory))))
 
 (defun tramp-sudoedit-handle-delete-file (filename &optional trash)
   "Like `delete-file' for Tramp files."
   (with-parsed-tramp-file-name filename nil
     (tramp-flush-file-properties v localname)
-    (unless
-	(tramp-sudoedit-send-command
-	 v (if (and trash delete-by-moving-to-trash) "trash" "rm")
-	 (tramp-compat-file-name-unquote localname))
-      ;; Propagate the error.
-      (with-current-buffer (tramp-get-connection-buffer v)
-	(goto-char (point-min))
-	(tramp-error-with-buffer
-	 nil v 'file-error "Couldn't delete %s" filename)))))
+    (if (and delete-by-moving-to-trash trash)
+	(move-file-to-trash filename)
+      (unless (tramp-sudoedit-send-command
+	       v "rm" (tramp-compat-file-name-unquote localname))
+	;; Propagate the error.
+	(with-current-buffer (tramp-get-connection-buffer v)
+	  (goto-char (point-min))
+	  (tramp-error-with-buffer
+	   nil v 'file-error "Couldn't delete %s" filename))))))
 
 (defun tramp-sudoedit-handle-expand-file-name (name &optional dir)
   "Like `expand-file-name' for Tramp files.
@@ -373,7 +371,7 @@ the result will be a local, non-Tramp, file name."
 
 (defun tramp-sudoedit-remote-acl-p (vec)
   "Check, whether ACL is enabled on the remote host."
-  (with-tramp-connection-property (tramp-get-connection-process vec) "acl-p"
+  (with-tramp-connection-property (tramp-get-process vec) "acl-p"
     (zerop (tramp-call-process vec "getfacl" nil nil nil "/"))))
 
 (defun tramp-sudoedit-handle-file-acl (filename)
@@ -478,7 +476,7 @@ the result will be a local, non-Tramp, file name."
 
 (defun tramp-sudoedit-remote-selinux-p (vec)
   "Check, whether SELINUX is enabled on the remote host."
-  (with-tramp-connection-property (tramp-get-connection-process vec) "selinux-p"
+  (with-tramp-connection-property (tramp-get-process vec) "selinux-p"
     (zerop (tramp-call-process vec "selinuxenabled"))))
 
 (defun tramp-sudoedit-handle-file-selinux-context (filename)
@@ -486,9 +484,8 @@ the result will be a local, non-Tramp, file name."
   (with-parsed-tramp-file-name filename nil
     (with-tramp-file-property v localname "file-selinux-context"
       (let ((context '(nil nil nil nil))
-	    (regexp (eval-when-compile
-		      (concat "\\([a-z0-9_]+\\):" "\\([a-z0-9_]+\\):"
-			      "\\([a-z0-9_]+\\):" "\\([a-z0-9_]+\\)"))))
+	    (regexp (concat "\\([[:alnum:]_]+\\):" "\\([[:alnum:]_]+\\):"
+			    "\\([[:alnum:]_]+\\):" "\\([[:alnum:]_]+\\)")))
 	(when (and (tramp-sudoedit-remote-selinux-p v)
 		   (tramp-sudoedit-send-command
 		    v "ls" "-d" "-Z"
@@ -513,10 +510,9 @@ the result will be a local, non-Tramp, file name."
 	  (goto-char (point-min))
 	  (forward-line)
 	  (when (looking-at
-		 (eval-when-compile
-		   (concat "[[:space:]]*\\([[:digit:]]+\\)"
-			   "[[:space:]]+\\([[:digit:]]+\\)"
-			   "[[:space:]]+\\([[:digit:]]+\\)")))
+		 (concat "[[:space:]]*\\([[:digit:]]+\\)"
+			 "[[:space:]]+\\([[:digit:]]+\\)"
+			 "[[:space:]]+\\([[:digit:]]+\\)"))
 	    (list (string-to-number (match-string 1))
 		  ;; The second value is the used size.  We need the
 		  ;; free size.
@@ -689,21 +685,19 @@ component is used as the target of the symlink."
 	    (tramp-flush-file-property v localname "file-selinux-context"))
 	  t)))))
 
-(defun tramp-sudoedit-get-remote-uid (vec id-format)
+(defun tramp-sudoedit-handle-get-remote-uid (vec id-format)
   "The uid of the remote connection VEC, in ID-FORMAT.
 ID-FORMAT valid values are `string' and `integer'."
-  (with-tramp-connection-property vec (format "uid-%s" id-format)
-    (if (equal id-format 'integer)
-	(tramp-sudoedit-send-command-and-read vec "id" "-u")
-      (tramp-sudoedit-send-command-string vec "id" "-un"))))
+  (if (equal id-format 'integer)
+      (tramp-sudoedit-send-command-and-read vec "id" "-u")
+    (tramp-sudoedit-send-command-string vec "id" "-un")))
 
-(defun tramp-sudoedit-get-remote-gid (vec id-format)
+(defun tramp-sudoedit-handle-get-remote-gid (vec id-format)
   "The gid of the remote connection VEC, in ID-FORMAT.
 ID-FORMAT valid values are `string' and `integer'."
-  (with-tramp-connection-property vec (format "gid-%s" id-format)
-    (if (equal id-format 'integer)
-	(tramp-sudoedit-send-command-and-read vec "id" "-g")
-      (tramp-sudoedit-send-command-string vec "id" "-gn"))))
+  (if (equal id-format 'integer)
+      (tramp-sudoedit-send-command-and-read vec "id" "-g")
+    (tramp-sudoedit-send-command-string vec "id" "-gn")))
 
 (defun tramp-sudoedit-handle-set-file-uid-gid (filename &optional uid gid)
   "Like `tramp-set-file-uid-gid' for Tramp files."
@@ -711,8 +705,8 @@ ID-FORMAT valid values are `string' and `integer'."
       (tramp-sudoedit-send-command
        v "chown"
        (format "%d:%d"
-	       (or uid (tramp-sudoedit-get-remote-uid v 'integer))
-	       (or gid (tramp-sudoedit-get-remote-gid v 'integer)))
+	       (or uid (tramp-get-remote-uid v 'integer))
+	       (or gid (tramp-get-remote-gid v 'integer)))
        (tramp-unquote-file-local-name filename))))
 
 (defun tramp-sudoedit-handle-write-region
@@ -721,10 +715,10 @@ ID-FORMAT valid values are `string' and `integer'."
   (with-parsed-tramp-file-name filename nil
     (let* ((uid (or (tramp-compat-file-attribute-user-id
 		     (file-attributes filename 'integer))
-		    (tramp-sudoedit-get-remote-uid v 'integer)))
+		    (tramp-get-remote-uid v 'integer)))
 	   (gid (or (tramp-compat-file-attribute-group-id
 		     (file-attributes filename 'integer))
-		    (tramp-sudoedit-get-remote-gid v 'integer)))
+		    (tramp-get-remote-gid v 'integer)))
 	   (flag (and (eq mustbenew 'excl) 'nofollow))
 	   (modes (tramp-default-file-modes filename flag)))
       (prog1
@@ -785,14 +779,7 @@ connection if a previous connection has died for some reason."
       (tramp-set-connection-local-variables vec)
 
       ;; Mark it as connected.
-      (tramp-set-connection-property p "connected" t))
-
-    ;; In `tramp-check-cached-permissions', the connection properties
-    ;; "{uid,gid}-{integer,string}" are used.  We set them to proper values.
-    (tramp-sudoedit-get-remote-uid vec 'integer)
-    (tramp-sudoedit-get-remote-gid vec 'integer)
-    (tramp-sudoedit-get-remote-uid vec 'string)
-    (tramp-sudoedit-get-remote-gid vec 'string)))
+      (tramp-set-connection-property p "connected" t))))
 
 (defun tramp-sudoedit-send-command (vec &rest args)
   "Send commands ARGS to connection VEC.

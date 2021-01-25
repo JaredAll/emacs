@@ -1,5 +1,5 @@
 /* Header for composite sequence handler.
-   Copyright (C) 2001-2020 Free Software Foundation, Inc.
+   Copyright (C) 2001-2021 Free Software Foundation, Inc.
    Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
      Registration Number H14PRO021
@@ -125,10 +125,13 @@ composition_registered_p (Lisp_Object prop)
     COMPOSITION_DECODE_REFS (rule_code, gref, nref);			\
   } while (false)
 
-/* Nonzero if the global reference point GREF and new reference point NREF are
+/* True if the global reference point GREF and new reference point NREF are
    valid.  */
-#define COMPOSITION_ENCODE_RULE_VALID(gref, nref)	\
-  (UNSIGNED_CMP (gref, <, 12) && UNSIGNED_CMP (nref, <, 12))
+INLINE bool
+COMPOSITION_ENCODE_RULE_VALID (int gref, int nref)
+{
+  return 0 <= gref && gref < 12 && 0 <= nref && nref < 12;
+}
 
 /* Return encoded composition rule for the pair of global reference
    point GREF and new reference point NREF.  Arguments must be valid.  */
@@ -327,6 +330,9 @@ extern int composition_update_it (struct composition_it *,
                                   ptrdiff_t, ptrdiff_t, Lisp_Object);
 
 extern ptrdiff_t composition_adjust_point (ptrdiff_t, ptrdiff_t);
+extern Lisp_Object composition_gstring_lookup_cache (Lisp_Object);
+
+extern void composition_gstring_cache_clear_font (Lisp_Object);
 
 INLINE_HEADER_END
 
